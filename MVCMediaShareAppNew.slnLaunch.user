@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "All Profiles",
+    "Projects": [
+      {
+        "Path": "az204mediashareapp\\MVCMediaShareAppNew.csproj",
+        "Action": "Start",
+        "DebugTarget": "IIS Express"
+      },
+      {
+        "Path": "imageprocessor\\ImageProcessor.csproj",
+        "Action": "Start",
+        "DebugTarget": "imageprocessor"
+      }
+    ]
+  }
+]
