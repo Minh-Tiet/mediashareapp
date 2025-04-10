@@ -1,0 +1,9 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/az204mediashareapp/obj
+/az204mediashareapp/bin
+/imageprocessor/bin
+/imageprocessor/obj
