@@ -5,5 +5,13 @@
 /.vs
 /az204mediashareapp/obj
 /az204mediashareapp/bin
+/az204mediashareapp/bin/Debug
+/az204mediashareapp/bin/Release
+/az204mediashareapp/obj/Debug
+/az204mediashareapp/obj/Release
 /imageprocessor/bin
+/imageprocessor/bin/Debug
+/imageprocessor/bin/Release
 /imageprocessor/obj
+/imageprocessor/obj/Debug
+/imageprocessor/obj/Release
