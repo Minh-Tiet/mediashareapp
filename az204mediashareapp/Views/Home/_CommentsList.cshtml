@@ -1,0 +1,35 @@
+@model IEnumerable<MVCMediaShareAppNew.Models.Comment>
+
+@if (Model != null && Model.Any())
+{
+    @foreach (var comment in Model)
+    {
+        <div class="card mb-2">
+            <div class="card-body">
+                <p class="card-text">@comment.Text</p>
+                @if (!string.IsNullOrEmpty(comment.MediaUrl))
+                {
+                    @if (comment.MediaType?.StartsWith("image/") == true)
+                    {
+                        <img src="@comment.MediaUrl" class="img-fluid rounded" style="max-height: 200px;">
+                    }
+                    else if (comment.MediaType?.StartsWith("video/") == true)
+                    {
+                        <video controls class="img-fluid rounded" style="max-height: 200px;">
+                            <source src="@comment.MediaUrl" type="@comment.MediaType">
+                            Your browser does not support the video tag.
+                        </video>
+                    }
+                }
+                <small class="text-muted">
+                    Posted by @(string.IsNullOrEmpty(comment.AuthorName) ? "Anonymous" : comment.AuthorName) on 
+                    @comment.CreatedAt.ToString("MMM dd, yyyy")
+                </small>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <p class="text-muted">No comments yet. Be the first to comment!</p>
+} 

@@ -1,0 +1,119 @@
+@model IEnumerable<MVCMediaShareAppNew.Models.UserImage>
+
+@{
+    ViewData["Title"] = "My Images";
+}
+
+<div class="image-sidebar-overlay">
+    <div class="image-sidebar">
+        <div class="sidebar-header">
+            <h2>My Images</h2>
+            <button type="button" class="close-sidebar" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        <div class="sidebar-content">
+            <div class="row">
+                @foreach (var image in Model)
+                {
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <img src="@image.ImageUrl" class="card-img-top" alt="User Image" style="height: 200px; object-fit: cover;">
+                            <div class="card-body">
+                                <div class="form-check">
+                                    <input class="form-check-input image-select" type="radio" name="selectedImage" 
+                                           value="@image.ImageUrl" id="image-@image.Id">
+                                    <label class="form-check-label" for="image-@image.Id">
+                                        Select this image
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        .image-sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1050;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .image-sidebar {
+            width: 80%;
+            max-width: 1200px;
+            height: 100%;
+            background-color: white;
+            box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 1rem;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-content {
+            padding: 1rem;
+        }
+
+        .close-sidebar {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        .close-sidebar:hover {
+            color: #dc3545;
+        }
+    </style>
+}
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Store selected image URL in localStorage
+            $('.image-select').change(function() {
+                localStorage.setItem('selectedImageUrl', $(this).val());
+            });
+
+            // Load previously selected image if exists
+            var selectedImageUrl = localStorage.getItem('selectedImageUrl');
+            if (selectedImageUrl) {
+                $(`input[value="${selectedImageUrl}"]`).prop('checked', true);
+            }
+
+            // Close sidebar functionality
+            $('.close-sidebar').click(function() {
+                $('.image-sidebar-overlay').fadeOut(300, function() {
+                    $(this).remove();
+                });
+            });
+
+            // Close on escape key
+            $(document).keyup(function(e) {
+                if (e.key === "Escape") {
+                    $('.image-sidebar-overlay').fadeOut(300, function() {
+                        $(this).remove();
+                    });
+                }
+            });
+        });
+    </script>
+} 

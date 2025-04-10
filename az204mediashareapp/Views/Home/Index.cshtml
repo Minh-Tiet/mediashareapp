@@ -1,0 +1,584 @@
+﻿@model IEnumerable<MVCMediaShareAppNew.Models.BlogPost>
+
+@{
+    ViewData["Title"] = "Blog Posts";
+}
+
+<style>
+    .sidebar-card {
+        position: fixed;
+        top: 0;
+        right: -400px;
+        width: 400px;
+        height: 100vh;
+        z-index: 1050;
+        transition: right 0.3s ease-in-out;
+        overflow-y: auto;
+    }
+    
+    .sidebar-card.show {
+        right: 0;
+    }
+    
+    .main-content {
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus {
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+    }
+    
+    .btn-primary {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+    
+    .btn-primary:hover {
+        background-color: #0b5ed7;
+        border-color: #0a58ca;
+    }
+    
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border: none;
+    }
+    
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    }
+    
+    @@media (max-width: 768px) {
+        .sidebar-card {
+            width: 100%;
+            right: -100%;
+        }
+    }
+
+    .overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1040;
+    }
+
+    .overlay.show {
+        display: block;
+    }
+</style>
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="sidebar-card">
+            <div class="card h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Create New Post</h5>
+                    <button type="button" class="btn-close" id="closeSidebar"></button>
+                </div>
+                <div class="card-body">
+                    <form id="addBlogForm" asp-action="CreatePost" method="post" enctype="multipart/form-data">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label for="Title" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="Title" name="Title" required 
+                                   minlength="3" maxlength="100" placeholder="Enter post title">
+                            <span class="text-danger" data-valmsg-for="Title" data-valmsg-replace="true"></span>
+                            <small class="form-text text-muted">Title must be between 3 and 100 characters</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="Content" class="form-label">Content</label>
+                            <textarea class="form-control" id="Content" name="Content" rows="4" required 
+                                      minlength="10" placeholder="Write your post content here"></textarea>
+                            <span class="text-danger" data-valmsg-for="Content" data-valmsg-replace="true"></span>
+                            <small class="form-text text-muted">Content must be at least 10 characters long</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="mediaFile" class="form-label">Media File (Image/Video)</label>
+                            <div class="d-flex gap-2">
+                                <input type="file" class="form-control" id="mediaFile" name="mediaFile" 
+                                       accept="image/*,video/*">
+                                <button type="button" class="btn btn-outline-secondary toggle-sidebar" data-context="blog">
+                                    <i class="fas fa-images"></i> My Images
+                                </button>
+                            </div>
+                            <small class="form-text text-muted">Supported formats: Images and Videos</small>
+                            <span class="text-danger" data-valmsg-for="mediaFile" data-valmsg-replace="true"></span>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-paper-plane me-2"></i>Publish Post
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overlay -->
+        <div class="overlay"></div>
+
+        <!-- Main Content -->
+        <div class="col-12 main-content">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">Blog Posts</h1>
+                <button type="button" class="btn btn-primary" id="toggleSidebar">
+                    <i class="fas fa-plus me-2"></i>Create New Post
+                </button>
+            </div>
+
+            @if (!Model.Any())
+            {
+                <div class="alert alert-info text-center">
+                    <h4 class="alert-heading">No Blog Posts Yet!</h4>
+                    <p>There are no blog posts available. Be the first to create one!</p>
+                    <hr>
+                    <p class="mb-0">Use the form on the left to create your first post.</p>
+                </div>
+            }
+            else
+            {
+                <div class="row">
+                    @foreach (var post in Model)
+                    {
+                        <div class="col-12 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    @if (!string.IsNullOrEmpty(post.MediaUrl))
+                                    {
+                                        <div class="text-center mb-3">
+                                            @if (post.MediaType?.StartsWith("image/") == true)
+                                            {
+                                                <img src="@post.MediaUrl" class="img-fluid rounded" alt="@post.Title" style="max-height: 400px; object-fit: contain;">
+                                            }
+                                            else if (post.MediaType?.StartsWith("video/") == true)
+                                            {
+                                                <video class="img-fluid rounded" controls style="max-height: 400px; object-fit: contain;">
+                                                    <source src="@post.MediaUrl" type="@post.MediaType">
+                                                    Your browser does not support the video tag.
+                                                </video>
+                                            }
+                                        </div>
+                                    }
+                                    <h2 class="card-title h4">@post.Title</h2>
+                                    <p class="card-text">@post.Content</p>
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <small class="text-muted">
+                                            <i class="far fa-calendar-alt me-1"></i>@post.CreatedAt.ToString("MMM dd, yyyy")
+                                        </small>
+                                        <small class="text-muted">
+                                            <i class="far fa-user me-1"></i>@(string.IsNullOrEmpty(post.AuthorName) ? "Anonymous" : post.AuthorName)
+                                        </small>
+                                    </div>
+                                    
+                                    <!-- Comments Section -->
+                                    <div class="comments-section mt-3">
+                                        <button class="btn btn-link p-0 mb-2 toggle-comments" data-blog-id="@post.id">
+                                            <i class="fas fa-comments me-1"></i>Comments @(@post.Comments?.Count ?? 0)
+                                        </button>
+                                        
+                                        <div class="comments-container" id="comments-@post.id" style="display: none;">
+                                            <div class="comments-list mb-3">
+                                                @if (post.Comments != null && post.Comments.Any())
+                                                {
+                                                    @foreach (var comment in post.Comments)
+                                                    {
+                                                        <div class="card mb-2">
+                                                            <div class="card-body">
+                                                                <p class="card-text">@comment.Text</p>
+                                                                @if (!string.IsNullOrEmpty(comment.MediaUrl))
+                                                                {
+                                                                    @if (comment.MediaType?.StartsWith("image/") == true)
+                                                                    {
+                                                                        <img src="@comment.MediaUrl" class="img-fluid rounded" style="max-height: 200px;">
+                                                                    }
+                                                                    else if (comment.MediaType?.StartsWith("video/") == true)
+                                                                    {
+                                                                        <video controls class="img-fluid rounded" style="max-height: 200px;">
+                                                                            <source src="@comment.MediaUrl" type="@comment.MediaType">
+                                                                            Your browser does not support the video tag.
+                                                                        </video>
+                                                                    }
+                                                                }
+                                                                <small class="text-muted">
+                                                                    <i class="far fa-user me-1"></i>@(string.IsNullOrEmpty(comment.AuthorName) ? "Anonymous" : comment.AuthorName)
+                                                                    <i class="far fa-calendar-alt ms-2 me-1"></i>@comment.CreatedAt.ToString("MMM dd, yyyy")
+                                                                </small>
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <p class="text-muted">No comments yet. Be the first to comment!</p>
+                                                }
+                                            </div>
+                                            
+                                            <div class="add-comment-form">
+                                                <form class="comment-form" data-blog-id="@post.id">
+                                                    @Html.AntiForgeryToken()
+                                                    <div class="mb-3">
+                                                        <textarea class="form-control comment-text" rows="2" placeholder="Write your comment..." required></textarea>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <div class="d-flex gap-2">
+                                                            <input type="file" class="form-control comment-media" accept="image/*,video/*">
+                                                            <button type="button" class="btn btn-outline-secondary toggle-sidebar" data-context="comment">
+                                                                <i class="fas fa-images"></i> My Images
+                                                            </button>
+                                                        </div>
+                                                        <small class="form-text text-muted">Optional: Add an image or video to your comment</small>
+                                                    </div>
+                                                    <button type="submit" class="btn btn-primary">
+                                                        <i class="fas fa-paper-plane me-2"></i>Post Comment
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Image Selection Modal -->
+<div class="modal fade" id="imageSelectionModal" tabindex="-1" aria-labelledby="imageSelectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageSelectionModalLabel">My Images</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-12">
+                        <form id="sidebarUploadForm" class="mb-3">
+                            @Html.AntiForgeryToken()
+                            <div class="mb-2">
+                                <input type="file" class="form-control" id="sidebarImageUpload" accept="image/*" required>
+                                <small class="form-text text-muted">Upload a new image (max 100MB)</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-upload me-2"></i>Upload Image
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="row" id="userImagesGrid">
+                    <div class="col-12 text-center">
+                        <i class="fas fa-spinner fa-spin"></i> Loading images...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.5/jquery.validate.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validation-unobtrusive/4.0.0/jquery.validate.unobtrusive.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            let selectedImageUrl = null;
+            let currentContext = null; // 'blog' or 'comment'
+
+            // Load user images
+            function loadUserImages() {
+                const imagesGrid = $('#userImagesGrid');
+                imagesGrid.html('<div class="col-12 text-center"><i class="fas fa-spinner fa-spin"></i> Loading images...</div>');
+
+                $.get('/Home/GetUserImages', function(images) {
+                    imagesGrid.empty();
+                    
+                    if (images.length === 0) {
+                        imagesGrid.html('<div class="col-12 text-center text-muted">No images uploaded yet</div>');
+                        return;
+                    }
+                    
+                    images.forEach(function(image) {
+                        const imageCard = `
+                            <div class="col-md-4 mb-3">
+                                <div class="card image-select-card" data-image-url="${image.imageUrl}">
+                                    <img src="${image.imageUrl}" class="card-img-top" alt="User Image" style="height: 200px; object-fit: cover;">
+                                    <div class="card-body p-2">
+                                        <button class="btn btn-sm btn-outline-primary w-100 select-image-btn">
+                                            Select
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        imagesGrid.append(imageCard);
+                    });
+                }).fail(function() {
+                    imagesGrid.html('<div class="col-12 text-center text-danger">Failed to load images</div>');
+                });
+            }
+
+            // Handle image selection modal toggle
+            $('.toggle-sidebar').click(function() {
+                currentContext = $(this).data('context');
+                const modal = new bootstrap.Modal(document.getElementById('imageSelectionModal'));
+                modal.show();
+                loadUserImages();
+            });
+
+            // Handle image selection from modal
+            $(document).on('click', '.select-image-btn', function() {
+                const card = $(this).closest('.image-select-card');
+                selectedImageUrl = card.data('image-url');
+                
+                // Update the file input with the selected image
+                if (currentContext === 'blog') {
+                    $('#mediaFile').val('');
+                    $('#mediaFile').data('selected-url', selectedImageUrl);
+                } else if (currentContext === 'comment') {
+                    $('.comment-media').val('');
+                    $('.comment-media').data('selected-url', selectedImageUrl);
+                }
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('imageSelectionModal'));
+                modal.hide();
+            });
+
+            // Handle image upload in modal
+            $('#sidebarUploadForm').submit(function(e) {
+                e.preventDefault();
+                const formData = new FormData();
+                const file = $('#sidebarImageUpload')[0].files[0];
+                
+                if (!file) {
+                    alert('Please select an image to upload');
+                    return;
+                }
+
+                // Validate file size (100MB limit)
+                const maxFileSize = 104857600; // 100MB in bytes
+                if (file.size > maxFileSize) {
+                    alert('File size must be less than 100MB');
+                    return;
+                }
+
+                // Validate file type
+                if (!file.type.startsWith('image/')) {
+                    alert('Only image files are allowed');
+                    return;
+                }
+
+                formData.append('mediaFile', file);
+                formData.append('Title', 'Image Upload');
+                formData.append('Content', 'Image uploaded from modal');
+
+                // Get the anti-forgery token
+                const token = $('input[name="__RequestVerificationToken"]').val();
+
+                // Show loading state
+                const uploadButton = $(this).find('button[type="submit"]');
+                const originalText = uploadButton.html();
+                uploadButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Uploading...');
+
+                $.ajax({
+                    url: '/Home/CreatePost',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        'RequestVerificationToken': token,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Clear the file input
+                            $('#sidebarImageUpload').val('');
+                            // Reload the images
+                            loadUserImages();
+                            // Show success message
+                            const successMessage = $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
+                                'Image uploaded successfully!' +
+                                '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>' +
+                                '</div>');
+                            $('#sidebarUploadForm').before(successMessage);
+                            // Auto-dismiss after 3 seconds
+                            setTimeout(() => successMessage.alert('close'), 3000);
+                        } else {
+                            alert(response.message || 'Failed to upload image');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        let errorMessage = 'Error uploading image';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
+                        }
+                        alert(errorMessage);
+                    },
+                    complete: function() {
+                        // Reset button state
+                        uploadButton.prop('disabled', false).html(originalText);
+                    }
+                });
+            });
+
+            // Load images when modal is shown
+            $('#imageSelectionModal').on('shown.bs.modal', function () {
+                loadUserImages();
+            });
+
+            // Toggle comments section
+            $('.toggle-comments').click(function() {
+                const blogId = $(this).data('blog-id');
+                const commentsContainer = $(`#comments-${blogId}`);
+                commentsContainer.slideToggle();
+            });
+
+            // Handle comment submission
+            $('.comment-form').submit(function(e) {
+                e.preventDefault();
+                const form = $(this);
+                const blogId = form.data('blog-id');
+                const commentText = form.find('.comment-text').val();
+                const mediaFile = form.find('.comment-media')[0].files[0];
+                const selectedImageUrl = form.find('.comment-media').data('selected-url');
+
+                if (!commentText || commentText.trim().length === 0) {
+                    alert('Please enter a comment');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('blogPostId', blogId);
+                formData.append('text', commentText);
+                if (mediaFile) {
+                    formData.append('mediaFile', mediaFile);
+                } else if (selectedImageUrl) {
+                    formData.append('selectedImageUrl', selectedImageUrl);
+                }
+
+                const token = $('input[name="__RequestVerificationToken"]').val();
+
+                $.ajax({
+                    url: '/Home/AddComment',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        'RequestVerificationToken': token
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            form.find('.comment-text').val('');
+                            form.find('.comment-media').val('');
+                            form.find('.comment-media').removeData('selected-url');
+                            
+                            const commentsContainer = $(`#comments-${blogId}`);
+                            const commentsList = commentsContainer.find('.comments-list');
+                            
+                            commentsList.html('<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading comments...</div>');
+                            
+                            $.get(`/Home/GetComments?blogPostId=${blogId}`, function(commentsHtml) {
+                                commentsList.html(commentsHtml);
+                            }).fail(function() {
+                                commentsList.html('<p class="text-danger">Failed to load comments. Please try again.</p>');
+                            });
+                        } else {
+                            alert(response.message || 'Failed to post comment');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        let errorMessage = 'Error posting comment';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
+                        }
+                        alert(errorMessage);
+                    }
+                });
+            });
+
+            // Initialize form validation
+            $("#addBlogForm").validate({
+                rules: {
+                    Title: {
+                        required: true,
+                        minlength: 3,
+                        maxlength: 100
+                    },
+                    Content: {
+                        required: true,
+                        minlength: 10
+                    }
+                },
+                messages: {
+                    Title: {
+                        required: "Title is required",
+                        minlength: "Title must be at least 3 characters long",
+                        maxlength: "Title must be less than 100 characters"
+                    },
+                    Content: {
+                        required: "Content is required",
+                        minlength: "Content must be at least 10 characters long"
+                    }
+                },
+                errorElement: 'div',
+                errorPlacement: function(error, element) {
+                    error.addClass('invalid-feedback');
+                    element.closest('.mb-3').append(error);
+                },
+                highlight: function(element, errorClass, validClass) {
+                    $(element).addClass('is-invalid');
+                },
+                unhighlight: function(element, errorClass, validClass) {
+                    $(element).removeClass('is-invalid');
+                }
+            });
+
+            // Reset form and validation when form is submitted
+            $('#addBlogForm').on('submit', function() {
+                if ($(this).valid()) {
+                    setTimeout(() => {
+                        $(this).trigger('reset');
+                        $(this).validate().resetForm();
+                        $('#mediaFile').removeData('selected-url');
+                    }, 1000);
+                }
+            });
+
+            // Sidebar toggle functionality
+            $('#toggleSidebar').click(function() {
+                $('.sidebar-card').addClass('show');
+                $('.overlay').addClass('show');
+                $('body').css('overflow', 'hidden');
+            });
+
+            $('#closeSidebar').click(function() {
+                $('.sidebar-card').removeClass('show');
+                $('.overlay').removeClass('show');
+                $('body').css('overflow', '');
+            });
+
+            $('.overlay').click(function() {
+                $('.sidebar-card').removeClass('show');
+                $('.overlay').removeClass('show');
+                $('body').css('overflow', '');
+            });
+
+            // Close sidebar on escape key
+            $(document).keyup(function(e) {
+                if (e.key === "Escape") {
+                    $('.sidebar-card').removeClass('show');
+                    $('.overlay').removeClass('show');
+                    $('body').css('overflow', '');
+                }
+            });
+        });
+    </script>
+}

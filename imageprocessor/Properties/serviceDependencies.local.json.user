@@ -1,0 +1,33 @@
+{
+  "dependencies": {
+    "secrets1": {
+      "restored": true,
+      "restoreTime": "2025-04-09T08:04:58.5602732Z"
+    },
+    "storage1": {
+      "restored": true,
+      "restoreTime": "2025-04-09T08:06:04.4093191Z"
+    },
+    "appInsights1": {
+      "restored": true,
+      "restoreTime": "2025-04-09T08:04:29.6721082Z"
+    }
+  },
+  "parameters": {
+    "storage1.serviceConnectorResourceGroupName": {
+      "Name": "storage1.serviceConnectorResourceGroupName",
+      "Type": "resourceGroup",
+      "Value": "az204RG"
+    },
+    "storage1.resourceGroupName": {
+      "Name": "storage1.resourceGroupName",
+      "Type": "resourceGroup",
+      "Value": "az204RG"
+    },
+    "storage1.subscriptionId": {
+      "Name": "storage1.subscriptionId",
+      "Type": "subscription",
+      "Value": "0a73a1b2-97b2-488c-8792-e63527806bf4"
+    }
+  }
+}

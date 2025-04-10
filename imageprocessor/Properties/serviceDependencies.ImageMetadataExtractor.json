@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "storage2": {
+      "resourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('resourceGroupName')]/providers/Microsoft.Storage/storageAccounts/az204mediashareapp1",
+      "type": "storage.azure",
+      "connectionId": "AzureWebJobsStorage"
+    },
+    "storage1": {
+      "serviceConnectorResourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('serviceConnectorResourceGroupName')]/providers/Microsoft.Web/sites/ImageMetadataExtractor/providers/Microsoft.ServiceLinker/linkers/StorageConnection_C57912094F, /subscriptions/0a73a1b2-97b2-488c-8792-e63527806bf4/resourceGroups/az204RG/providers/Microsoft.Web/sites/ImageMetadataExtractor/providers/Microsoft.ServiceLinker/linkers/StorageConnection_3B413592DA",
+      "secretStore": "AzureAppSettings",
+      "resourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('resourceGroupName')]/providers/Microsoft.Storage/storageAccounts/az204mediashareapp1",
+      "type": "storage.azure",
+      "connectionId": "StorageConnection",
+      "dynamicId": null
+    }
+  }
+}
