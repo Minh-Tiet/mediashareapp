@@ -15,3 +15,5 @@
 /imageprocessor/obj
 /imageprocessor/obj/Debug
 /imageprocessor/obj/Release
+/imageprocessor/obj/Debug/net8.0/ImageProcessor.AssemblyInfo.cs
+/imageprocessor/obj/Debug/net8.0/ImageProcessor.AssemblyInfoInputs.cache
