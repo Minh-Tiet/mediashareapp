@@ -1,0 +1,48 @@
+{
+  "dependencies": {
+    "storage2": {
+      "restored": true,
+      "restoreTime": "2025-04-11T10:52:54.7476896Z"
+    },
+    "storage1": {
+      "restored": true,
+      "restoreTime": "2025-04-11T10:52:57.6696097Z"
+    },
+    "appInsights1": {
+      "restored": true,
+      "restoreTime": "2025-04-11T10:52:53.0000126Z"
+    }
+  },
+  "parameters": {
+    "storage2.resourceGroupName": {
+      "Name": "storage2.resourceGroupName",
+      "Type": "resourceGroup",
+      "Value": "az204RG"
+    },
+    "appInsights1.resourceGroupName": {
+      "Name": "appInsights1.resourceGroupName",
+      "Type": "resourceGroup",
+      "Value": "az204rg"
+    },
+    "storage1.resourceGroupName": {
+      "Name": "storage1.resourceGroupName",
+      "Type": "resourceGroup",
+      "Value": "az204RG"
+    },
+    "storage1.subscriptionId": {
+      "Name": "storage1.subscriptionId",
+      "Type": "subscription",
+      "Value": "0a73a1b2-97b2-488c-8792-e63527806bf4"
+    },
+    "appInsights1.subscriptionId": {
+      "Name": "appInsights1.subscriptionId",
+      "Type": "subscription",
+      "Value": "0a73a1b2-97b2-488c-8792-e63527806bf4"
+    },
+    "storage2.subscriptionId": {
+      "Name": "storage2.subscriptionId",
+      "Type": "subscription",
+      "Value": "0a73a1b2-97b2-488c-8792-e63527806bf4"
+    }
+  }
+}
