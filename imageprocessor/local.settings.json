@@ -1,9 +1,15 @@
 {
-    "IsEncrypted": false,
+  "IsEncrypted": false,
   "Values": {
     "AzureWebJobsStorage": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-    "QueueName":  "image-processing-queue",
+    "QueueName": "image-processing-queue",
     "StorageConnection": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;"
+  },
+  "CosmosDb": {
+    "AccountEndpoint": "https://az204mediashareapp1.documents.azure.com:443/",
+    "AccountKey": "9DDin5Sf7LTeM65RqjvQNV8mEQPx5YMIWO6chpKn2FFO1Te4kyCiEiiWmxDYzTbhwCaeKT4BGbrmACDbGSrfdQ==",
+    "DatabaseName": "MediaShareAppDB",
+    "ContainerName": "MediaStoreItem"
   }
 }

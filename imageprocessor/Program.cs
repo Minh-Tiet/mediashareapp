@@ -1,7 +1,9 @@
+using ImageProcessor.Models;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ImageProcessor.Services;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
@@ -15,5 +17,9 @@ builder.Services.AddLogging(logging =>
 // builder.Services
 //     .AddApplicationInsightsTelemetryWorkerService()
 //     .ConfigureFunctionsApplicationInsights();
+
+// Configure Cosmos DB
+builder.Services.Configure<CosmosDbSettings>(builder.Configuration.GetSection("CosmosDb"));
+builder.Services.AddSingleton<ICosmosDbService, CosmosDbService>();
 
 builder.Build().Run();
