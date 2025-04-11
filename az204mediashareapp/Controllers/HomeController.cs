@@ -45,6 +45,9 @@ namespace MVCMediaShareAppNew.Controllers
                     post.Comments = await _cosmosDbService.GetCommentsForBlogPostAsync(post.id, userId);
                 }
 
+                // Sort posts by CreatedAt in descending order
+                posts = [.. posts.OrderByDescending(p => p.CreatedAt)];
+
                 return View(posts);
             }
             catch (Exception ex)
@@ -174,6 +177,23 @@ namespace MVCMediaShareAppNew.Controllers
             {
                 _logger.LogError(ex, "Error deleting all blogs");
                 return Json(new { success = false, error = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeletePost(string id)
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
+                await _cosmosDbService.DeleteBlogPostAsync(id, userId);
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting blog post with id: {Id}", id);
+                return Json(new { success = false, message = "Error deleting blog post. Please try again later." });
             }
         }
 
