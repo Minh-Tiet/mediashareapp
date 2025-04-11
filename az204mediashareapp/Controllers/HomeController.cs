@@ -128,10 +128,10 @@ namespace MVCMediaShareAppNew.Controllers
                 {
                     var message = new
                     {
-                        BlogPostId = post.id,
-                        AuthorId = post.AuthorId,
-                        MediaUrl = post.MediaUrl,
-                        MediaType = post.MediaType
+                        id = Guid.NewGuid().ToString(),
+                        MediaStorageBlobUrl = post.MediaUrl,
+                        MediaType = post.MediaType,
+                        AuthorId = post.AuthorId
                     };
                     await _queueService.SendMessageAsync(JsonSerializer.Serialize(message));
                 }

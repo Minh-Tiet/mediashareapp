@@ -18,6 +18,7 @@
     <Import Project="$(NuGetPackageRoot)microsoft.azure.functions.worker.sdk\2.0.0\build\Microsoft.Azure.Functions.Worker.Sdk.props" Condition="Exists('$(NuGetPackageRoot)microsoft.azure.functions.worker.sdk\2.0.0\build\Microsoft.Azure.Functions.Worker.Sdk.props')" />
   </ImportGroup>
   <PropertyGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <PkgNewtonsoft_Json Condition=" '$(PkgNewtonsoft_Json)' == '' ">C:\Users\minht\.nuget\packages\newtonsoft.json\10.0.2</PkgNewtonsoft_Json>
     <PkgMicrosoft_Azure_Functions_Worker_Sdk_Analyzers Condition=" '$(PkgMicrosoft_Azure_Functions_Worker_Sdk_Analyzers)' == '' ">C:\Users\minht\.nuget\packages\microsoft.azure.functions.worker.sdk.analyzers\1.2.2</PkgMicrosoft_Azure_Functions_Worker_Sdk_Analyzers>
     <PkgMicrosoft_Azure_Functions_Worker_Sdk Condition=" '$(PkgMicrosoft_Azure_Functions_Worker_Sdk)' == '' ">C:\Users\minht\.nuget\packages\microsoft.azure.functions.worker.sdk\2.0.0</PkgMicrosoft_Azure_Functions_Worker_Sdk>
   </PropertyGroup>
