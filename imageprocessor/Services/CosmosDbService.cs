@@ -15,6 +15,7 @@ namespace ImageProcessor.Services
     {
         private readonly ILogger<CosmosDbService> _logger;
         private readonly CosmosClient _cosmosClient;
+        private readonly Container _container;
         private readonly CosmosDbSettings _cosmosDbSettings;
 
         public CosmosDbService(
@@ -23,6 +24,7 @@ namespace ImageProcessor.Services
         {
             _cosmosDbSettings = settings.Value;
             _logger = logger;
+
             _cosmosClient = new CosmosClient(
                 _cosmosDbSettings.AccountEndpoint,
                 _cosmosDbSettings.AccountKey,
@@ -30,14 +32,14 @@ namespace ImageProcessor.Services
                 {
                     ApplicationName = "ImageProcessor"
                 });
+            _container = _cosmosClient.GetContainer(_cosmosDbSettings.DatabaseName, _cosmosDbSettings.ContainerName);
         }
 
         public async Task<MediaStoreItem> AddMediaStoreItem(MediaStoreItem newItem)
         {
             try
             {
-                var container = _cosmosClient.GetContainer(_cosmosDbSettings.DatabaseName, _cosmosDbSettings.ContainerName);
-                var response = await container.CreateItemAsync(newItem, new PartitionKey(newItem.AuthorId));
+                var response = await _container.CreateItemAsync(newItem, new PartitionKey(newItem.AuthorId));
                 _logger.LogInformation($"Item created with id: {response.Resource.id}");
 
                 return response.Resource;
