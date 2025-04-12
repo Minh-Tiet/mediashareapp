@@ -15,6 +15,7 @@ namespace MVCMediaShareAppNew.Services
         Task DeleteAllBlogPostsAsync(string userId);
         Task<List<Comment>> GetCommentsForBlogPostAsync(string blogPostId, string currentUserId);
         Task<List<UserImage>> GetUserImagesAsync(string userId);
+        Task DeleteMediaStoreItem(string id, string authorId);
     }
 
     public class CosmosDbService : ICosmosDbService
@@ -243,6 +244,22 @@ namespace MVCMediaShareAppNew.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving all medias");
+                throw;
+            }
+        }
+
+        public async Task DeleteMediaStoreItem(string id, string authorId)
+        {
+            try
+            {
+                await _mediaStoreContainer.DeleteItemAsync<MediaStoreItem>(
+                    id,
+                    new PartitionKey(authorId));
+                _logger.LogInformation("Media store item deleted successfully: {Id}", id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting media store item: {Id}", id);
                 throw;
             }
         }

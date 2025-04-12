@@ -300,39 +300,68 @@
                 const imagesGrid = $('#userImagesGrid');
                 imagesGrid.html('<div class="col-12 text-center"><i class="fas fa-spinner fa-spin"></i> Loading images...</div>');
 
-                $.get('/Home/GetUserImages', function(images) {
+                $.get('/Home/GetUserImages', function(response) {
+                    console.log('Received response:', response); // Debug log
                     imagesGrid.empty();
                     
-                    if (images.length === 0) {
+                    if (!response) {
+                        imagesGrid.html('<div class="col-12 text-center text-danger">Failed to load images: No response from server</div>');
+                        return;
+                    }
+                    
+                    if (response.length === 0) {
                         imagesGrid.html('<div class="col-12 text-center text-muted">No images uploaded yet</div>');
                         return;
                     }
                     
-                    // Use document fragment for better performance
+                    // Create a document fragment for better performance
                     const fragment = document.createDocumentFragment();
                     
-                    images.forEach(function(image) {
+                    response.forEach(function(image) {
+                        console.log('Processing image:', image); // Debug log
+                        
+                        // Try different possible property names
+                        const imageUrl = image.imageUrlWithSas || image.ImageUrlWithSas || image.url;
+                        const imageId = image.id || image.Id;
+                        const imageName = image.originMediaName || image.OriginMediaName || image.name;
+
+                        if (!imageUrl) {
+                            console.warn('Image URL is missing for image:', image);
+                            return;
+                        }
+
                         const col = document.createElement('div');
                         col.className = 'col-md-4 mb-3';
                         
                         const card = document.createElement('div');
                         card.className = 'card image-select-card';
-                        card.dataset.imageUrl = image.imageUrl;
+                        card.dataset.imageUrl = imageUrl;
+                        card.dataset.imageId = imageId;
                         
                         const img = document.createElement('img');
                         img.className = 'card-img-top';
-                        img.src = image.imageUrl;
-                        img.alt = 'User Image';
+                        img.src = imageUrl;
+                        img.alt = imageName || 'User Image';
                         img.style.height = '200px';
                         img.style.objectFit = 'cover';
+                        img.onerror = function() {
+                            console.error('Failed to load image:', imageUrl);
+                            this.src = '/images/placeholder.jpg'; // Add a fallback image
+                        };
                         
                         const cardBody = document.createElement('div');
                         cardBody.className = 'card-body p-2';
+                        
+                        const title = document.createElement('h6');
+                        title.className = 'card-title text-truncate';
+                        title.textContent = imageName || 'Untitled Image';
+                        title.title = imageName || 'Untitled Image';
                         
                         const button = document.createElement('button');
                         button.className = 'btn btn-sm btn-outline-primary w-100 select-image-btn';
                         button.textContent = 'Select';
                         
+                        cardBody.appendChild(title);
                         cardBody.appendChild(button);
                         card.appendChild(img);
                         card.appendChild(cardBody);
@@ -341,8 +370,9 @@
                     });
                     
                     imagesGrid.append(fragment);
-                }).fail(function() {
-                    imagesGrid.html('<div class="col-12 text-center text-danger">Failed to load images</div>');
+                }).fail(function(xhr, status, error) {
+                    console.error('Failed to load images:', error); // Debug log
+                    imagesGrid.html('<div class="col-12 text-center text-danger">Failed to load images: ' + error + '</div>');
                 });
             }
 
@@ -358,6 +388,7 @@
             $(document).on('click', '.select-image-btn', function() {
                 const card = $(this).closest('.image-select-card');
                 selectedImageUrl = card.data('image-url');
+                const imageId = card.data('image-id');
                 
                 // Update the hidden input with the selected image URL
                 $('#selectedImageUrl').val(selectedImageUrl);

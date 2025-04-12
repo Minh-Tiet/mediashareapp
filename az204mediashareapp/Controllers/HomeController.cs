@@ -105,7 +105,7 @@ namespace MVCMediaShareAppNew.Controllers
 
                 if (mediaFile != null)
                 {
-                    var fileName = $"{Guid.NewGuid()}_{Path.GetFileName(mediaFile.FileName)}{Path.GetExtension(mediaFile.FileName)}";
+                    var fileName = $"{Guid.NewGuid()}_{Path.GetFileNameWithoutExtension(mediaFile.FileName)}{Path.GetExtension(mediaFile.FileName)}";
                     string baseMediaUrl = await _blobStorageService.UploadFileAsync(mediaFile, fileName);
                     post.MediaType = mediaFile.ContentType;
 
@@ -210,6 +210,44 @@ namespace MVCMediaShareAppNew.Controllers
             return View();
         }
 
+        public async Task<IActionResult> MyImages()
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return RedirectToAction("Index");
+                }
+
+                var mediaStores = await _cosmosDbService.GetAllMediaItemsAsync(userId);
+                
+                // Convert media items to UserImage models, only including posts with media
+                var images = mediaStores
+                    .Where(mediaItem => !string.IsNullOrEmpty(mediaItem.MediaStorageBlobUrlWithSas) && mediaItem.MediaType?.StartsWith("image/") == true)
+                    .Select(mediaItem => new UserImage
+                    {
+                        Id = mediaItem.id,
+                        UserId = userId,
+                        UserName = User.Identity?.Name ?? "Anonymous",
+                        ImageUrlWithSas = mediaItem.MediaStorageBlobUrlWithSas,
+                        OriginMediaName = mediaItem.OriginMediaName,
+                        ImageBlogName = mediaItem.MediaStorageBlobName,
+                        CreatedAt = mediaItem.CreatedAt
+                    })
+                    .OrderByDescending(img => img.CreatedAt)
+                    .ToList();
+
+                return View(images);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading user images");
+                ModelState.AddModelError("", "Error loading images. Please try again later.");
+                return View(new List<UserImage>());
+            }
+        }
+
         [AllowAnonymous]
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
@@ -309,13 +347,17 @@ namespace MVCMediaShareAppNew.Controllers
             }
         }
 
-
         [HttpGet]
         public async Task<IActionResult> GetUserImages()
         {
             try
             {
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Json(new { success = false, message = "User not authenticated" });
+                }
+
                 var mediaStores = await _cosmosDbService.GetAllMediaItemsAsync(userId);
                 
                 // Convert media item to UserImage models, only including posts with media
@@ -324,9 +366,11 @@ namespace MVCMediaShareAppNew.Controllers
                     .Select(mediaItem => new UserImage
                     {
                         Id = mediaItem.id,
+                        UserId = userId,
+                        UserName = User.Identity?.Name ?? "Anonymous",
                         ImageUrlWithSas = mediaItem.MediaStorageBlobUrlWithSas,
-                        ImageBlogName = mediaItem.MediaStorageBlobName,
                         OriginMediaName = mediaItem.OriginMediaName,
+                        ImageBlogName = mediaItem.MediaStorageBlobName,
                         CreatedAt = mediaItem.CreatedAt
                     })
                     .OrderByDescending(img => img.CreatedAt)
@@ -337,7 +381,42 @@ namespace MVCMediaShareAppNew.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading user images");
-                return Json(new List<UserImage>());
+                return Json(new { success = false, message = "Error loading images" });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteUserMedia(string id)
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Json(new { success = false, message = "User not authenticated" });
+                }
+
+                // Get the media item to get the blob name
+                var mediaItems = await _cosmosDbService.GetAllMediaItemsAsync(userId);
+                var mediaItem = mediaItems.FirstOrDefault(m => m.id == id);
+                
+                if (mediaItem == null)
+                {
+                    return Json(new { success = false, message = "Media item not found" });
+                }
+
+                // Delete from Cosmos DB
+                await _cosmosDbService.DeleteMediaStoreItem(id, userId);
+
+                // Delete from Blob Storage
+                await _blobStorageService.DeleteBlobAsync(mediaItem.MediaStorageBlobName);
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting user media");
+                return Json(new { success = false, message = "Error deleting media" });
             }
         }
     }
