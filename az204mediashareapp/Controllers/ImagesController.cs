@@ -42,7 +42,7 @@ namespace MVCMediaShareAppNew.Controllers
                         Id = post.id,
                         UserId = post.AuthorId ?? userId,
                         UserName = post.AuthorName ?? "Anonymous",
-                        ImageUrl = post.MediaUrl,
+                        ImageUrlWithSas = post.MediaUrl,
                         CreatedAt = post.CreatedAt
                     })
                     .OrderByDescending(img => img.CreatedAt)

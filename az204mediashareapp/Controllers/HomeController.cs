@@ -45,6 +45,9 @@ namespace MVCMediaShareAppNew.Controllers
                     post.Comments = await _cosmosDbService.GetCommentsForBlogPostAsync(post.id, userId);
                 }
 
+                // Sort posts by CreatedAt in descending order
+                posts = [.. posts.OrderByDescending(p => p.CreatedAt)];
+
                 return View(posts);
             }
             catch (Exception ex)
@@ -102,38 +105,46 @@ namespace MVCMediaShareAppNew.Controllers
 
                 if (mediaFile != null)
                 {
-                    var fileName = $"{Guid.NewGuid()}{Path.GetExtension(mediaFile.FileName)}";
+                    var fileName = $"{Guid.NewGuid()}_{Path.GetFileNameWithoutExtension(mediaFile.FileName)}{Path.GetExtension(mediaFile.FileName)}";
                     string baseMediaUrl = await _blobStorageService.UploadFileAsync(mediaFile, fileName);
                     post.MediaType = mediaFile.ContentType;
 
                     // Generate container-level SAS token and append it to the base URL
                     string sasToken = _blobStorageService.GetSasToken();
                     post.MediaUrl = $"{baseMediaUrl}{sasToken}"; // Append SAS token to the URL
+                    post.MediaBlobName = fileName; // Store the base URL for later use
+                    post.OriginMediaName = mediaFile.FileName; // Store the original file name
+
+                    var blogCreationTask = await _cosmosDbService.CreateBlogPostAsync(post);
+                    var createdBlogPost = blogCreationTask.Resource; // Retrieve the BlogPost object
+
+                    // Send message to queue for image processing
+                    if (!string.IsNullOrEmpty(post.MediaUrl))
+                    {
+                        var message = new
+                        {
+                            id = Guid.NewGuid().ToString(),
+                            OriginMediaName = createdBlogPost.OriginMediaName,
+                            MediaStorageBlobName = createdBlogPost.MediaBlobName,
+                            MediaStorageBlobUrlWithSas = createdBlogPost.MediaUrl,
+                            MediaType = createdBlogPost.MediaType,
+                            AuthorId = createdBlogPost.AuthorId,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        await _queueService.SendMessageAsync(JsonSerializer.Serialize(message));
+                    }
+
+                    _logger.LogInformation("Blog post created successfully: {Title}", createdBlogPost.Title);
+
                 }
                 else if (!string.IsNullOrEmpty(selectedImageUrl))
                 {
                     // Use the selected image from the sidebar
                     post.MediaUrl = selectedImageUrl;
                     post.MediaType = "image/jpeg"; // Default to JPEG, adjust if needed
-                }
 
-                var blogCreationTask = await _cosmosDbService.CreateBlogPostAsync(post);
-                var createdBlogPost = blogCreationTask.Resource; // Retrieve the BlogPost object
-                
-                // Send message to queue for image processing
-                if (!string.IsNullOrEmpty(post.MediaUrl))
-                {
-                    var message = new
-                    {
-                        id = Guid.NewGuid().ToString(),
-                        MediaStorageBlobUrl = post.MediaUrl,
-                        MediaType = post.MediaType,
-                        AuthorId = post.AuthorId
-                    };
-                    await _queueService.SendMessageAsync(JsonSerializer.Serialize(message));
+                    await _cosmosDbService.CreateBlogPostAsync(post);
                 }
-                
-                _logger.LogInformation("Blog post created successfully: {Title}", post.Title);
 
                 // Check if this is an AJAX request (from sidebar upload)
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
@@ -177,9 +188,64 @@ namespace MVCMediaShareAppNew.Controllers
             }
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeletePost(string id)
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
+                await _cosmosDbService.DeleteBlogPostAsync(id, userId);
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting blog post with id: {Id}", id);
+                return Json(new { success = false, message = "Error deleting blog post. Please try again later." });
+            }
+        }
+
         public IActionResult Privacy()
         {
             return View();
+        }
+
+        public async Task<IActionResult> MyImages()
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return RedirectToAction("Index");
+                }
+
+                var mediaStores = await _cosmosDbService.GetAllMediaItemsAsync(userId);
+                
+                // Convert media items to UserImage models, only including posts with media
+                var images = mediaStores
+                    .Where(mediaItem => !string.IsNullOrEmpty(mediaItem.MediaStorageBlobUrlWithSas) && mediaItem.MediaType?.StartsWith("image/") == true)
+                    .Select(mediaItem => new UserImage
+                    {
+                        Id = mediaItem.id,
+                        UserId = userId,
+                        UserName = User.Identity?.Name ?? "Anonymous",
+                        ImageUrlWithSas = mediaItem.MediaStorageBlobUrlWithSas,
+                        OriginMediaName = mediaItem.OriginMediaName,
+                        ImageBlogName = mediaItem.MediaStorageBlobName,
+                        CreatedAt = mediaItem.CreatedAt
+                    })
+                    .OrderByDescending(img => img.CreatedAt)
+                    .ToList();
+
+                return View(images);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading user images");
+                ModelState.AddModelError("", "Error loading images. Please try again later.");
+                return View(new List<UserImage>());
+            }
         }
 
         [AllowAnonymous]
@@ -281,52 +347,31 @@ namespace MVCMediaShareAppNew.Controllers
             }
         }
 
-        public async Task<IActionResult> MyImages()
-        {
-            try
-            {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
-                var blogPosts = await _cosmosDbService.GetAllBlogPostsAsync(userId);
-                
-                // Convert blog posts to UserImage models, only including posts with media
-                var images = blogPosts
-                    .Where(post => !string.IsNullOrEmpty(post.MediaUrl))
-                    .Select(post => new UserImage
-                    {
-                        Id = post.id,
-                        UserId = post.AuthorId ?? "",
-                        UserName = post.AuthorName ?? "anonymous",
-                        ImageUrl = post.MediaUrl,
-                        CreatedAt = post.CreatedAt,
-                    })
-                    .ToList();
-
-                return View(images);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error loading user images");
-                ModelState.AddModelError("", "Error loading images. Please try again later.");
-                return View(new List<UserImage>());
-            }
-        }
-
         [HttpGet]
         public async Task<IActionResult> GetUserImages()
         {
             try
             {
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
-                var blogPosts = await _cosmosDbService.GetAllBlogPostsAsync(userId);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Json(new { success = false, message = "User not authenticated" });
+                }
+
+                var mediaStores = await _cosmosDbService.GetAllMediaItemsAsync(userId);
                 
-                // Convert blog posts to UserImage models, only including posts with media
-                var images = blogPosts
-                    .Where(post => !string.IsNullOrEmpty(post.MediaUrl) && post.MediaType?.StartsWith("image/") == true)
-                    .Select(post => new UserImage
+                // Convert media item to UserImage models, only including posts with media
+                var images = mediaStores
+                    .Where(mediaItem => !string.IsNullOrEmpty(mediaItem.MediaStorageBlobUrlWithSas) && mediaItem.MediaType?.StartsWith("image/") == true)
+                    .Select(mediaItem => new UserImage
                     {
-                        Id = post.id,
-                        ImageUrl = post.MediaUrl,
-                        CreatedAt = post.CreatedAt
+                        Id = mediaItem.id,
+                        UserId = userId,
+                        UserName = User.Identity?.Name ?? "Anonymous",
+                        ImageUrlWithSas = mediaItem.MediaStorageBlobUrlWithSas,
+                        OriginMediaName = mediaItem.OriginMediaName,
+                        ImageBlogName = mediaItem.MediaStorageBlobName,
+                        CreatedAt = mediaItem.CreatedAt
                     })
                     .OrderByDescending(img => img.CreatedAt)
                     .ToList();
@@ -336,7 +381,42 @@ namespace MVCMediaShareAppNew.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading user images");
-                return Json(new List<UserImage>());
+                return Json(new { success = false, message = "Error loading images" });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteUserMedia(string id)
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Json(new { success = false, message = "User not authenticated" });
+                }
+
+                // Get the media item to get the blob name
+                var mediaItems = await _cosmosDbService.GetAllMediaItemsAsync(userId);
+                var mediaItem = mediaItems.FirstOrDefault(m => m.id == id);
+                
+                if (mediaItem == null)
+                {
+                    return Json(new { success = false, message = "Media item not found" });
+                }
+
+                // Delete from Cosmos DB
+                await _cosmosDbService.DeleteMediaStoreItem(id, userId);
+
+                // Delete from Blob Storage
+                await _blobStorageService.DeleteBlobAsync(mediaItem.MediaStorageBlobName);
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting user media");
+                return Json(new { success = false, message = "Error deleting media" });
             }
         }
     }

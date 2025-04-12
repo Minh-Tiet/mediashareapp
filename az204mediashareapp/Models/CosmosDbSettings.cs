@@ -7,5 +7,6 @@ namespace MVCMediaShareAppNew.Models
         public string AccountKey { get; set; }
         public string DatabaseName { get; set; }
         public string ContainerName { get; set; }
+        public string MediaStoreContainerName { get; set; }
     }
 } 

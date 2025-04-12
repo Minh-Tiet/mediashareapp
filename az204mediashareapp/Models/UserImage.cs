@@ -14,8 +14,14 @@ namespace MVCMediaShareAppNew.Models
         [JsonPropertyName("userName")]
         public string UserName { get; set; }
 
-        [JsonPropertyName("imageUrl")]
-        public string ImageUrl { get; set; }
+        [JsonPropertyName("originMediaName")]
+        public string OriginMediaName { get; set; }
+
+        [JsonPropertyName("imageBlogName")]
+        public string ImageBlogName { get; set; }
+
+        [JsonPropertyName("imageUrlWithSas")]
+        public string ImageUrlWithSas { get; set; }
 
         [JsonPropertyName("createdAt")]
         public DateTime CreatedAt { get; set; }

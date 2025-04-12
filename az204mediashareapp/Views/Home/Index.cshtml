@@ -106,6 +106,7 @@
                                     <i class="fas fa-images"></i> My Images
                                 </button>
                             </div>
+                            <input type="hidden" id="selectedImageUrl" name="selectedImageUrl" />
                             <small class="form-text text-muted">Supported formats: Images and Videos</small>
                             <span class="text-danger" data-valmsg-for="mediaFile" data-valmsg-replace="true"></span>
                         </div>
@@ -168,9 +169,14 @@
                                         <small class="text-muted">
                                             <i class="far fa-calendar-alt me-1"></i>@post.CreatedAt.ToString("MMM dd, yyyy")
                                         </small>
-                                        <small class="text-muted">
-                                            <i class="far fa-user me-1"></i>@(string.IsNullOrEmpty(post.AuthorName) ? "Anonymous" : post.AuthorName)
-                                        </small>
+                                        <div class="d-flex align-items-center">
+                                            <small class="text-muted me-3">
+                                                <i class="far fa-user me-1"></i>@(string.IsNullOrEmpty(post.AuthorName) ? "Anonymous" : post.AuthorName)
+                                            </small>
+                                            <button class="btn btn-outline-danger btn-sm delete-post" data-blog-id="@post.id" data-blog-title="@post.Title">
+                                                <i class="fas fa-trash-alt"></i> Delete
+                                            </button>
+                                        </div>
                                     </div>
                                     
                                     <!-- Comments Section -->
@@ -294,32 +300,79 @@
                 const imagesGrid = $('#userImagesGrid');
                 imagesGrid.html('<div class="col-12 text-center"><i class="fas fa-spinner fa-spin"></i> Loading images...</div>');
 
-                $.get('/Home/GetUserImages', function(images) {
+                $.get('/Home/GetUserImages', function(response) {
+                    console.log('Received response:', response); // Debug log
                     imagesGrid.empty();
                     
-                    if (images.length === 0) {
+                    if (!response) {
+                        imagesGrid.html('<div class="col-12 text-center text-danger">Failed to load images: No response from server</div>');
+                        return;
+                    }
+                    
+                    if (response.length === 0) {
                         imagesGrid.html('<div class="col-12 text-center text-muted">No images uploaded yet</div>');
                         return;
                     }
                     
-                    images.forEach(function(image) {
-                        const imageCard = `
-                            <div class="col-md-4 mb-3">
-                                <div class="card image-select-card" data-image-url="${image.imageUrl}">
-                                    <img src="${image.imageUrl}" class="card-img-top" alt="User Image" style="height: 200px; object-fit: cover;">
-                                    <div class="card-body p-2">
-                                        <button class="btn btn-sm btn-outline-primary w-100 select-image-btn">
-                                            Select
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
+                    // Create a document fragment for better performance
+                    const fragment = document.createDocumentFragment();
+                    
+                    response.forEach(function(image) {
+                        console.log('Processing image:', image); // Debug log
                         
-                        imagesGrid.append(imageCard);
+                        // Try different possible property names
+                        const imageUrl = image.imageUrlWithSas || image.ImageUrlWithSas || image.url;
+                        const imageId = image.id || image.Id;
+                        const imageName = image.originMediaName || image.OriginMediaName || image.name;
+
+                        if (!imageUrl) {
+                            console.warn('Image URL is missing for image:', image);
+                            return;
+                        }
+
+                        const col = document.createElement('div');
+                        col.className = 'col-md-4 mb-3';
+                        
+                        const card = document.createElement('div');
+                        card.className = 'card image-select-card';
+                        card.dataset.imageUrl = imageUrl;
+                        card.dataset.imageId = imageId;
+                        
+                        const img = document.createElement('img');
+                        img.className = 'card-img-top';
+                        img.src = imageUrl;
+                        img.alt = imageName || 'User Image';
+                        img.style.height = '200px';
+                        img.style.objectFit = 'cover';
+                        img.onerror = function() {
+                            console.error('Failed to load image:', imageUrl);
+                            this.src = '/images/placeholder.jpg'; // Add a fallback image
+                        };
+                        
+                        const cardBody = document.createElement('div');
+                        cardBody.className = 'card-body p-2';
+                        
+                        const title = document.createElement('h6');
+                        title.className = 'card-title text-truncate';
+                        title.textContent = imageName || 'Untitled Image';
+                        title.title = imageName || 'Untitled Image';
+                        
+                        const button = document.createElement('button');
+                        button.className = 'btn btn-sm btn-outline-primary w-100 select-image-btn';
+                        button.textContent = 'Select';
+                        
+                        cardBody.appendChild(title);
+                        cardBody.appendChild(button);
+                        card.appendChild(img);
+                        card.appendChild(cardBody);
+                        col.appendChild(card);
+                        fragment.appendChild(col);
                     });
-                }).fail(function() {
-                    imagesGrid.html('<div class="col-12 text-center text-danger">Failed to load images</div>');
+                    
+                    imagesGrid.append(fragment);
+                }).fail(function(xhr, status, error) {
+                    console.error('Failed to load images:', error); // Debug log
+                    imagesGrid.html('<div class="col-12 text-center text-danger">Failed to load images: ' + error + '</div>');
                 });
             }
 
@@ -335,19 +388,77 @@
             $(document).on('click', '.select-image-btn', function() {
                 const card = $(this).closest('.image-select-card');
                 selectedImageUrl = card.data('image-url');
+                const imageId = card.data('image-id');
                 
-                // Update the file input with the selected image
-                if (currentContext === 'blog') {
-                    $('#mediaFile').val('');
-                    $('#mediaFile').data('selected-url', selectedImageUrl);
-                } else if (currentContext === 'comment') {
-                    $('.comment-media').val('');
-                    $('.comment-media').data('selected-url', selectedImageUrl);
+                // Update the hidden input with the selected image URL
+                $('#selectedImageUrl').val(selectedImageUrl);
+                
+                // Clear the file input
+                $('#mediaFile').val('');
+                
+                // Show preview of selected image
+                const previewContainer = $('#mediaFile').closest('.mb-3');
+                let preview = previewContainer.find('.selected-image-preview');
+                
+                if (preview.length === 0) {
+                    preview = $('<div class="selected-image-preview mt-2"></div>');
+                    previewContainer.append(preview);
                 }
+                
+                preview.html(`
+                    <div class="alert alert-info d-flex align-items-center">
+                        <img src="${selectedImageUrl}" class="me-2" style="width: 50px; height: 50px; object-fit: cover;">
+                        <span>Selected image from your collection</span>
+                        <button type="button" class="btn-close ms-auto remove-selected-image"></button>
+                    </div>
+                `);
                 
                 // Close modal
                 const modal = bootstrap.Modal.getInstance(document.getElementById('imageSelectionModal'));
                 modal.hide();
+            });
+
+            // Handle removal of selected image
+            $(document).on('click', '.remove-selected-image', function() {
+                $('#selectedImageUrl').val('');
+                $(this).closest('.selected-image-preview').remove();
+            });
+
+            // Handle file input change
+            $('#mediaFile').change(function() {
+                // Clear the selected image URL and preview when a new file is selected
+                $('#selectedImageUrl').val('');
+                $('.selected-image-preview').remove();
+                
+                // Show preview of selected file
+                const file = this.files[0];
+                if (file) {
+                    const previewContainer = $(this).closest('.mb-3');
+                    let preview = previewContainer.find('.selected-image-preview');
+                    
+                    if (preview.length === 0) {
+                        preview = $('<div class="selected-image-preview mt-2"></div>');
+                        previewContainer.append(preview);
+                    }
+                    
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        preview.html(`
+                            <div class="alert alert-info d-flex align-items-center">
+                                <img src="${e.target.result}" class="me-2" style="width: 50px; height: 50px; object-fit: cover;">
+                                <span>Selected file: ${file.name}</span>
+                                <button type="button" class="btn-close ms-auto remove-selected-file"></button>
+                            </div>
+                        `);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // Handle removal of selected file
+            $(document).on('click', '.remove-selected-file', function() {
+                $('#mediaFile').val('');
+                $(this).closest('.selected-image-preview').remove();
             });
 
             // Handle image upload in modal
@@ -544,10 +655,17 @@
             // Reset form and validation when form is submitted
             $('#addBlogForm').on('submit', function() {
                 if ($(this).valid()) {
+                    // Show loading state
+                    const submitButton = $(this).find('button[type="submit"]');
+                    const originalText = submitButton.html();
+                    submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Publishing...');
+                    
                     setTimeout(() => {
                         $(this).trigger('reset');
                         $(this).validate().resetForm();
-                        $('#mediaFile').removeData('selected-url');
+                        $('#selectedImageUrl').val('');
+                        $('.selected-image-preview').remove();
+                        submitButton.prop('disabled', false).html(originalText);
                     }, 1000);
                 }
             });
@@ -577,6 +695,54 @@
                     $('.sidebar-card').removeClass('show');
                     $('.overlay').removeClass('show');
                     $('body').css('overflow', '');
+                }
+            });
+
+            // Handle blog post deletion
+            $(document).on('click', '.delete-post', function() {
+                const blogId = $(this).data('blog-id');
+                const blogTitle = $(this).data('blog-title');
+                
+                if (confirm(`Are you sure you want to delete the post "${blogTitle}"? This action cannot be undone.`)) {
+                    const token = $('input[name="__RequestVerificationToken"]').val();
+                    
+                    $.ajax({
+                        url: '/Home/DeletePost',
+                        type: 'POST',
+                        data: { id: blogId },
+                        headers: {
+                            'RequestVerificationToken': token
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                // Remove the blog post card from the DOM
+                                $(`.delete-post[data-blog-id="${blogId}"]`).closest('.col-12').fadeOut(300, function() {
+                                    $(this).remove();
+                                    
+                                    // If no posts remain, show the empty state message
+                                    if ($('.col-12.mb-4').length === 0) {
+                                        $('.row').html(`
+                                            <div class="alert alert-info text-center">
+                                                <h4 class="alert-heading">No Blog Posts Yet!</h4>
+                                                <p>There are no blog posts available. Be the first to create one!</p>
+                                                <hr>
+                                                <p class="mb-0">Use the form on the left to create your first post.</p>
+                                            </div>
+                                        `);
+                                    }
+                                });
+                            } else {
+                                alert(response.message || 'Failed to delete post');
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            let errorMessage = 'Error deleting post';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                errorMessage = xhr.responseJSON.message;
+                            }
+                            alert(errorMessage);
+                        }
+                    });
                 }
             });
         });

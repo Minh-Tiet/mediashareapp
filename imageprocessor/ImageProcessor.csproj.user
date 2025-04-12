@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <_LastSelectedProfileId>C:\Users\minht\source\repos\Minh-Tiet\az204mediashareapp\.github\workflows\ImageMetadataExtractor.yml</_LastSelectedProfileId>
+    <_LastSelectedProfileId>C:\Users\minht\source\repos\Minh-Tiet\imageprocessor\Properties\PublishProfiles\ImageMetadataExtractor - Zip Deploy.pubxml</_LastSelectedProfileId>
     <ActiveDebugProfile>imageprocessor</ActiveDebugProfile>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

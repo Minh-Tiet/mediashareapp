@@ -7,6 +7,7 @@ namespace MVCMediaShareAppNew.Services
     public interface ICosmosDbService
     {
         Task<IEnumerable<BlogPost>> GetAllBlogPostsAsync(string userId);
+        Task<IEnumerable<MediaStoreItem>> GetAllMediaItemsAsync(string userId);
         Task<BlogPost?> GetBlogPostAsync(string id, string authorId);
         Task<ItemResponse<BlogPost>> CreateBlogPostAsync(BlogPost blogPost);
         Task UpdateBlogPostAsync(BlogPost blogPost);
@@ -14,11 +15,13 @@ namespace MVCMediaShareAppNew.Services
         Task DeleteAllBlogPostsAsync(string userId);
         Task<List<Comment>> GetCommentsForBlogPostAsync(string blogPostId, string currentUserId);
         Task<List<UserImage>> GetUserImagesAsync(string userId);
+        Task DeleteMediaStoreItem(string id, string authorId);
     }
 
     public class CosmosDbService : ICosmosDbService
     {
         private readonly Container _container;
+        private readonly Container _mediaStoreContainer;
         private readonly ILogger<CosmosDbService> _logger;
         private readonly CosmosDbSettings _settings;
 
@@ -38,6 +41,7 @@ namespace MVCMediaShareAppNew.Services
                 var client = new CosmosClient(connectionString);
                 var database = client.GetDatabase(_settings.DatabaseName);
                 _container = database.GetContainer(_settings.ContainerName);
+                _mediaStoreContainer = database.GetContainer(_settings.MediaStoreContainerName);
             }
             catch (Exception ex)
             {
@@ -217,6 +221,45 @@ namespace MVCMediaShareAppNew.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving user images for user: {UserId}", userId);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<MediaStoreItem>> GetAllMediaItemsAsync(string userId)
+        {
+            try
+            {
+                var query = new QueryDefinition("SELECT * FROM c Where c.AuthorId=@userId").WithParameter("@userId", userId);
+                var iterator = _mediaStoreContainer.GetItemQueryIterator<MediaStoreItem>(query);
+                var results = new List<MediaStoreItem>();
+
+                while (iterator.HasMoreResults)
+                {
+                    var response = await iterator.ReadNextAsync();
+                    results.AddRange(response.ToList());
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving all medias");
+                throw;
+            }
+        }
+
+        public async Task DeleteMediaStoreItem(string id, string authorId)
+        {
+            try
+            {
+                await _mediaStoreContainer.DeleteItemAsync<MediaStoreItem>(
+                    id,
+                    new PartitionKey(authorId));
+                _logger.LogInformation("Media store item deleted successfully: {Id}", id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting media store item: {Id}", id);
                 throw;
             }
         }
