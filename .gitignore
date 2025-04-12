@@ -3,19 +3,19 @@
 ################################################################################
 
 .vs
-az204mediashareapp/obj
-az204mediashareapp/bin
-az204mediashareapp/bin/Debug
-az204mediashareapp/bin/Release
-az204mediashareapp/obj/Debug
-az204mediashareapp/obj/Release
-az204mediashareapp/Properties/PublishProfiles/
-imageprocessor/bin
-imageprocessor/bin/Debug
-imageprocessor/bin/Release
-imageprocessor/obj
-imageprocessor/obj/Debug
-imageprocessor/obj/Release
+az204mediashareapp/obj/*    
+az204mediashareapp/bin/*
+az204mediashareapp/bin/Debug/*
+az204mediashareapp/bin/Release/*
+az204mediashareapp/obj/Debug/*
+az204mediashareapp/obj/Release/*
+az204mediashareapp/Properties/PublishProfiles/*
+imageprocessor/bin/*    
+imageprocessor/bin/Debug/*
+imageprocessor/bin/Release/*
+imageprocessor/obj/*
+imageprocessor/obj/Debug/*
+imageprocessor/obj/Release/*
 imageprocessor/obj/Debug/net8.0/ImageProcessor.AssemblyInfo.cs
 imageprocessor/obj/Debug/net8.0/ImageProcessor.AssemblyInfoInputs.cache
 /az204mediashareapp/Properties/serviceDependencies.json
@@ -23,3 +23,4 @@ imageprocessor/obj/Debug/net8.0/ImageProcessor.AssemblyInfoInputs.cache
 /az204mediashareapp/Properties/PublishProfiles/az204containerreg11.pubxml
 /az204mediashareapp/Properties/serviceDependencies.local.json
 /az204mediashareapp/az204mediashareapp.zip
+/imageprocessor/obj/Debug/net8.0/ImageProcessor.assets.cache
