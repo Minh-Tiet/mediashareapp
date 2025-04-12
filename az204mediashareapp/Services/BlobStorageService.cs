@@ -60,6 +60,12 @@ namespace MVCMediaShareAppNew.Services
             _containerClient.CreateIfNotExists(PublicAccessType.None);
         }
 
+        /// <summary>
+        /// Uploads a file to Azure Blob Storage.
+        /// </summary>
+        /// <param name="file"></param>
+        /// <param name="fileName"></param>
+        /// <returns></returns>
         public async Task<string> UploadFileAsync(IFormFile file, string fileName)
         {
             try

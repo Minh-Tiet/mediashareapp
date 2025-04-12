@@ -20,7 +20,12 @@ namespace MVCMediaShareAppNew.Models
         
         [JsonPropertyName("mediaUrl")]
         public string? MediaUrl { get; set; }
-        
+        [JsonPropertyName("mediaBlobName")]
+        public string MediaBlobName { get; set; }
+
+        [JsonPropertyName("originMediaName")]
+        public string OriginMediaName { get; set; }
+
         [JsonPropertyName("mediaType")]
         public string? MediaType { get; set; }
         
