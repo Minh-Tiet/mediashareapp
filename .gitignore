@@ -16,8 +16,6 @@ imageprocessor/bin/Release/*
 imageprocessor/obj/*
 imageprocessor/obj/Debug/*
 imageprocessor/obj/Release/*
-imageprocessor/obj/Debug/net8.0/ImageProcessor.AssemblyInfo.cs
-imageprocessor/obj/Debug/net8.0/ImageProcessor.AssemblyInfoInputs.cache
 /az204mediashareapp/Properties/serviceDependencies.json
 /az204mediashareapp/Properties/PublishProfiles/az204containerreg1.pubxml
 /az204mediashareapp/Properties/PublishProfiles/az204containerreg11.pubxml
