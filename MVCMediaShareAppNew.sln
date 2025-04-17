@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MVCMediaShareAppNew", "az20
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageProcessor", "imageprocessor\ImageProcessor.csproj", "{2F58F5FB-518F-51D1-F119-20F89CF0EA27}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlogNotificationProcessor", "BlogNotificationProcessor\BlogNotificationProcessor.csproj", "{150774F8-3EE3-482B-B9AB-47B33DCC453E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{2F58F5FB-518F-51D1-F119-20F89CF0EA27}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2F58F5FB-518F-51D1-F119-20F89CF0EA27}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2F58F5FB-518F-51D1-F119-20F89CF0EA27}.Release|Any CPU.Build.0 = Release|Any CPU
+		{150774F8-3EE3-482B-B9AB-47B33DCC453E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{150774F8-3EE3-482B-B9AB-47B33DCC453E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{150774F8-3EE3-482B-B9AB-47B33DCC453E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{150774F8-3EE3-482B-B9AB-47B33DCC453E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

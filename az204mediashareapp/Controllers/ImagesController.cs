@@ -32,7 +32,7 @@ namespace MVCMediaShareAppNew.Controllers
                     return BadRequest("UserId is required");
                 }
 
-                var blogPosts = await _cosmosDbService.GetAllBlogPostsAsync(userId);
+                var blogPosts = await _cosmosDbService.GetAllBlogPostsByAuthorAsync(userId);
                 
                 // Convert blog posts to UserImage models, only including posts with media
                 var images = blogPosts
