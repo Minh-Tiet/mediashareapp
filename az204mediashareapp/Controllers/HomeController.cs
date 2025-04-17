@@ -489,5 +489,76 @@ namespace MVCMediaShareAppNew.Controllers
                 return Json(new { success = false, message = "Error deleting media" });
             }
         }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleLike(string blogPostId)
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Json(new { success = false, message = "User not authenticated" });
+                }
+
+                // Get the blog post
+                var blogPost = await _cosmosDbService.GetBlogPostAsync(blogPostId);
+                if (blogPost == null)
+                {
+                    return Json(new { success = false, message = "Blog post not found" });
+                }
+
+                bool isLiked = blogPost.LikedBy.Contains(userId);
+                if (isLiked)
+                {
+                    // Unlike: Remove user from LikedBy and decrement LikeCount
+                    blogPost.LikedBy.Remove(userId);
+                    blogPost.LikeCount = Math.Max(0, blogPost.LikeCount - 1);
+                }
+                else
+                {
+                    // Like: Add user to LikedBy and increment LikeCount
+                    blogPost.LikedBy.Add(userId);
+                    blogPost.LikeCount++;
+                }
+
+                // Update the blog post in Cosmos DB
+                await _cosmosDbService.UpdateBlogPostAsync(blogPost);
+                _logger.LogInformation("{Action} blog post {BlogPostId} by user {UserId}", isLiked ? "Unliked" : "Liked", blogPostId, userId);
+
+                // Publish EventGrid event
+                var likeEvent = new EventGridEvent(
+                    subject: $"BlogPost/{blogPostId}/Like",
+                    eventType: isLiked ? "BlogPost.Unliked" : "BlogPost.Liked",
+                    dataVersion: "1.0",
+                    data: new
+                    {
+                        BlogId = blogPostId,
+                        UserId = userId,
+                        LikeCount = blogPost.LikeCount,
+                        Action = isLiked ? "Unliked" : "Liked",
+                        Timestamp = DateTime.UtcNow
+                    })
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    EventTime = DateTime.UtcNow
+                };
+                await _eventGridService.SendEventAsync(likeEvent);
+                _logger.LogInformation("Published EventGrid event for {Action} on blog post: {BlogId}", isLiked ? "unlike" : "like", blogPostId);
+
+                return Json(new
+                {
+                    success = true,
+                    likeCount = blogPost.LikeCount,
+                    isLiked = !isLiked
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error toggling like for blog post {BlogPostId}", blogPostId);
+                return Json(new { success = false, message = "Error updating like. Please try again later." });
+            }
+        }
     }
 }

@@ -44,5 +44,9 @@ namespace MVCMediaShareAppNew.Models
 
         [JsonPropertyName("state")]
         public string State { get; set; } = Enum.GetName<BlogCreationState>(BlogCreationState.Draft);
+
+        // New properties for likes
+        public int LikeCount { get; set; } // Total number of likes
+        public List<string> LikedBy { get; set; } = new List<string>(); // List of user IDs who liked the post
     }
 } 
