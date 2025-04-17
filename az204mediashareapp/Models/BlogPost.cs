@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using System.ComponentModel.DataAnnotations;
+using MVCMediaShareAppNew.Enums;
 
 namespace MVCMediaShareAppNew.Models
 {
@@ -20,11 +21,11 @@ namespace MVCMediaShareAppNew.Models
         
         [JsonPropertyName("mediaUrl")]
         public string? MediaUrl { get; set; }
-        [JsonPropertyName("mediaBlobName")]
-        public string MediaBlobName { get; set; }
+        [JsonPropertyName("mediaBlobName")] 
+        public string? MediaBlobName { get; set; }
 
         [JsonPropertyName("originMediaName")]
-        public string OriginMediaName { get; set; }
+        public string? OriginMediaName { get; set; }
 
         [JsonPropertyName("mediaType")]
         public string? MediaType { get; set; }
@@ -40,5 +41,8 @@ namespace MVCMediaShareAppNew.Models
 
         [JsonPropertyName("comments")]
         public List<Comment> Comments { get; set; } = new List<Comment>();
+
+        [JsonPropertyName("state")]
+        public string State { get; set; } = Enum.GetName<BlogCreationState>(BlogCreationState.Draft);
     }
 } 
