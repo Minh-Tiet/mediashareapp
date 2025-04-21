@@ -21,19 +21,19 @@ namespace MVCMediaShareAppNew.Controllers
         private readonly ILogger<HomeController> _logger;
         private readonly ICosmosDbService _cosmosDbService;
         private readonly IBlobStorageService _blobStorageService;
-        private readonly IQueueService _queueService;
+        private readonly IQueueServiceFactory _queueServiceFactory;
         private readonly IEventGridService _eventGridService;
 
         public HomeController(ILogger<HomeController> logger,
             ICosmosDbService cosmosDbService,
             IBlobStorageService blobStorageService,
-            IQueueService queueService,
+            IQueueServiceFactory queueServiceFactory,
             IEventGridService eventGridService)
         {
             _logger = logger;
             _cosmosDbService = cosmosDbService;
             _blobStorageService = blobStorageService;
-            _queueService = queueService;
+            _queueServiceFactory = queueServiceFactory;
             _eventGridService = eventGridService;
         }
 
@@ -143,9 +143,14 @@ namespace MVCMediaShareAppNew.Controllers
                             AuthorId = createdBlogPost.AuthorId,
                             CreatedAt = DateTime.UtcNow
                         };
-                        await _queueService.SendMessageAsync(JsonSerializer.Serialize(message));
+                        var storageQueueService = _queueServiceFactory.GetQueueService("Storage");
+                        await storageQueueService.SendMessageAsync(JsonSerializer.Serialize(message), "image-processing-queue");
+                        _logger.LogInformation("Sent message to Storage queue: image-processing-queue");
 
-                        // TODO: Publish event for image data creation
+                        // TODO: enqueue message to the queue for image processing
+                        var sbQueueService = _queueServiceFactory.GetQueueService("ServiceBus");
+                        await sbQueueService.SendMessageAsync(JsonSerializer.Serialize(message), "resize-queue");
+                        _logger.LogInformation("Sent message to ServiceBus queue: resize-queue");
                     }
                 }
                 else if (!string.IsNullOrEmpty(selectedImageUrl))

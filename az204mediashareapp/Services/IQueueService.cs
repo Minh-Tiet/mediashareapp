@@ -4,6 +4,6 @@ namespace MVCMediaShareAppNew.Services
 {
     public interface IQueueService
     {
-        Task SendMessageAsync(string message);
+        Task SendMessageAsync(string message, string queueName);
     }
 } 

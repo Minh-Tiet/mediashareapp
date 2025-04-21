@@ -80,6 +80,10 @@ builder.Services.AddSingleton<ICosmosDbService, CosmosDbService>();
 builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
 builder.Services.AddSingleton<IQueueService, QueueService>();
 builder.Services.AddSingleton<IEventGridService, EventGridService>();
+builder.Services.AddSingleton<SBQueueService>();
+
+// Register factory
+builder.Services.AddSingleton<IQueueServiceFactory, QueueServiceFactory>();
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
