@@ -76,10 +76,15 @@ builder.Services.Configure<CosmosDbSettings>(builder.Configuration.GetSection("C
 // Configure Azure Storage
 builder.Services.Configure<AzureStorageSettings>(builder.Configuration.GetSection("AzureStorage"));
 
+// Configure ServiceBus
+builder.Services.Configure<ServiceBusSettings>(builder.Configuration.GetSection("ServiceBus"));
+
 builder.Services.AddSingleton<ICosmosDbService, CosmosDbService>();
 builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
-builder.Services.AddSingleton<IQueueService, QueueService>();
 builder.Services.AddSingleton<IEventGridService, EventGridService>();
+
+// Register queue services
+builder.Services.AddSingleton<QueueService>();
 builder.Services.AddSingleton<SBQueueService>();
 
 // Register factory
