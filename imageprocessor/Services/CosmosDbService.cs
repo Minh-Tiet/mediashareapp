@@ -3,6 +3,8 @@ using Microsoft.Extensions.Options;
 using ImageProcessor.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
+using System.Threading.Tasks;
+using System;
 
 namespace ImageProcessor.Services
 {

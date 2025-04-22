@@ -6,12 +6,15 @@ namespace MVCMediaShareAppNew.Services
 {
     public interface ICosmosDbService
     {
-        Task<IEnumerable<BlogPost>> GetAllBlogPostsAsync(string userId);
+        Task<IEnumerable<BlogPost>> GetAllBlogPostsAsync();
+        Task<IEnumerable<BlogPost>> GetAllBlogPostsByAuthorAsync(string authorId);
         Task<IEnumerable<MediaStoreItem>> GetAllMediaItemsAsync(string userId);
         Task<BlogPost?> GetBlogPostAsync(string id, string authorId);
+        Task<BlogPost?> GetBlogPostAsync(string itemId);
         Task<ItemResponse<BlogPost>> CreateBlogPostAsync(BlogPost blogPost);
         Task UpdateBlogPostAsync(BlogPost blogPost);
         Task DeleteBlogPostAsync(string id, string authorId);
+        Task DeleteBlogPostAsync(string id);
         Task DeleteAllBlogPostsAsync(string userId);
         Task<List<Comment>> GetCommentsForBlogPostAsync(string blogPostId, string currentUserId);
         Task<List<UserImage>> GetUserImagesAsync(string userId);
@@ -51,11 +54,13 @@ namespace MVCMediaShareAppNew.Services
             }
         }
 
-        public async Task<IEnumerable<BlogPost>> GetAllBlogPostsAsync(string userId)
+        
+
+        public async Task<IEnumerable<BlogPost>> GetAllBlogPostsAsync()
         {
             try
             {
-                var query = new QueryDefinition("SELECT * FROM c Where c.AuthorId=@userId").WithParameter("@userId", userId);
+                var query = new QueryDefinition("SELECT * FROM c");
                 var iterator = _container.GetItemQueryIterator<BlogPost>(query);
                 var results = new List<BlogPost>();
 
@@ -136,10 +141,39 @@ namespace MVCMediaShareAppNew.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting blog post: {Id}", id);
-                throw;
+                throw new Exception(ex.Message);
             }
         }
 
+        public async Task DeleteBlogPostAsync(string id)
+        {
+            try
+            {
+                // Query to find the item by id (cross-partition query)
+                var query = new QueryDefinition("SELECT * FROM c WHERE c.id = @id")
+                    .WithParameter("@id", id);
+                var iterator = _container.GetItemQueryIterator<BlogPost>(query);
+
+                // Retrieve the item
+                while (iterator.HasMoreResults)
+                {
+                    var response = await iterator.ReadNextAsync();
+                    var item = response.FirstOrDefault();
+                    if (item != null)
+                    {
+                        // Extract AuthorId (adjust based on your document structure)
+                        string authorId = item.AuthorId;
+                        // Delete the item using id and partition key
+                        await DeleteBlogPostAsync(id, authorId);
+                        return;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
         public async Task DeleteAllBlogPostsAsync(string userId)
         {
             var query = new QueryDefinition("SELECT * FROM c WHERE c.AuthorId = @userId")
@@ -187,7 +221,7 @@ namespace MVCMediaShareAppNew.Services
 
                 // Filter comments to only show those from the current user
                 var userComments = blogPost.Comments
-                    .Where(c => c.AuthorId == currentUserId)
+                    //.Where(c => c.AuthorId == currentUserId)
                     .OrderByDescending(c => c.CreatedAt)
                     .ToList();
 
@@ -260,6 +294,59 @@ namespace MVCMediaShareAppNew.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting media store item: {Id}", id);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<BlogPost>> GetAllBlogPostsByAuthorAsync(string authorId)
+        {
+            try
+            {
+                var query = new QueryDefinition("SELECT * FROM c Where c.AuthorId=@userId").WithParameter("@userId", authorId);
+                var iterator = _container.GetItemQueryIterator<BlogPost>(query);
+                var results = new List<BlogPost>();
+
+                while (iterator.HasMoreResults)
+                {
+                    var response = await iterator.ReadNextAsync();
+                    results.AddRange(response.ToList());
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving all blog posts");
+                throw;
+            }
+        }
+
+        public async Task<BlogPost?> GetBlogPostAsync(string itemId)
+        {
+            try
+            {
+                string query = $"SELECT * FROM c WHERE c.id = @itemId";
+                QueryDefinition queryDefinition = new QueryDefinition(query)
+                    .WithParameter("@itemId", itemId);
+
+                using FeedIterator<BlogPost> feedIterator = _container.GetItemQueryIterator<BlogPost>(queryDefinition);
+                while (feedIterator.HasMoreResults)
+                {
+                    FeedResponse<BlogPost> response = await feedIterator.ReadNextAsync();
+                    foreach (BlogPost item in response)
+                    {
+                        return item;
+                    }
+                }
+                return null;
+            }
+            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving blog post with ID: {Id}", itemId);
                 throw;
             }
         }

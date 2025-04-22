@@ -1,4 +1,6 @@
-﻿@model IEnumerable<MVCMediaShareAppNew.Models.BlogPost>
+﻿@using System.Security.Claims;
+
+@model IEnumerable<MVCMediaShareAppNew.Models.BlogPost>
 
 @{
     ViewData["Title"] = "Blog Posts";
@@ -173,7 +175,14 @@
                                             <small class="text-muted me-3">
                                                 <i class="far fa-user me-1"></i>@(string.IsNullOrEmpty(post.AuthorName) ? "Anonymous" : post.AuthorName)
                                             </small>
-                                            <button class="btn btn-outline-danger btn-sm delete-post" data-blog-id="@post.id" data-blog-title="@post.Title">
+                                            <!-- Like Button -->
+                                            <button class="btn btn-outline-primary btn-sm like-post me-2"
+                                                    data-blog-id="@post.id"
+                                                    data-liked="@(post.LikedBy.Contains(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "") ? "true" : "false")">
+                                                <i class="@(post.LikedBy.Contains(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "") ? "fas fa-heart" : "far fa-heart") me-1"></i>
+                                                <span class="like-count">@post.LikeCount</span> Like@(post.LikeCount == 1 ? "" : "s")
+                                            </button>
+                                            <button class="btn btn-outline-danger btn-sm delete-post" data-blog-id="@post.id" data-author-id="@post.AuthorId" data-blog-title="@post.Title">
                                                 <i class="fas fa-trash-alt"></i> Delete
                                             </button>
                                         </div>
@@ -701,6 +710,7 @@
             // Handle blog post deletion
             $(document).on('click', '.delete-post', function() {
                 const blogId = $(this).data('blog-id');
+                const authorId = $(this).data('author-id');
                 const blogTitle = $(this).data('blog-title');
                 
                 if (confirm(`Are you sure you want to delete the post "${blogTitle}"? This action cannot be undone.`)) {
@@ -709,7 +719,7 @@
                     $.ajax({
                         url: '/Home/DeletePost',
                         type: 'POST',
-                        data: { id: blogId },
+                        data: { id: blogId, authorId: authorId },
                         headers: {
                             'RequestVerificationToken': token
                         },
@@ -744,6 +754,50 @@
                         }
                     });
                 }
+            });
+
+            // Handle like/unlike button click
+            $(document).on('click', '.like-post', function() {
+                const button = $(this);
+                const blogId = button.data('blog-id');
+                const isLiked = button.data('liked') === true;
+                const token = $('input[name="__RequestVerificationToken"]').val();
+
+                // Prevent multiple clicks
+                button.prop('disabled', true);
+
+                $.ajax({
+                    url: '/Home/ToggleLike',
+                    type: 'POST',
+                    data: { blogPostId: blogId },
+                    headers: {
+                        'RequestVerificationToken': token
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Update like count and button state
+                            const likeCount = response.likeCount;
+                            const newIsLiked = response.isLiked;
+                            button.data('liked', newIsLiked);
+                            button.find('.like-count').text(likeCount);
+                            button.find('i').removeClass(newIsLiked ? 'far fa-heart' : 'fas fa-heart')
+                                          .addClass(newIsLiked ? 'fas fa-heart' : 'far fa-heart');
+                            button.find('span').text(`${likeCount} Like${likeCount === 1 ? '' : 's'}`);
+                        } else {
+                            alert(response.message || 'Failed to update like');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        let errorMessage = 'Error updating like';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
+                        }
+                        alert(errorMessage);
+                    },
+                    complete: function() {
+                        button.prop('disabled', false);
+                    }
+                });
             });
         });
     </script>

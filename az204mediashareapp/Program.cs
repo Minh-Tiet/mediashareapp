@@ -1,30 +1,25 @@
 using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
-using Microsoft.Azure.Cosmos.Serialization.HybridRow.Schemas;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
 using MVCMediaShareAppNew.Models;
 using MVCMediaShareAppNew.Services;
 using StackExchange.Redis;
-using System.Security.Claims;
-using System.Text.Encodings.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add development-specific configuration
+// Add configuration
 builder.Configuration
     .SetBasePath(builder.Environment.ContentRootPath)
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
-if (!builder.Environment.IsDevelopment())
+if(!builder.Environment.IsDevelopment())
 {
     // Configure authentication with Microsoft Identity Web
     builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
@@ -42,26 +37,23 @@ if (!builder.Environment.IsDevelopment())
                     {
                         Scheme = "https",
                         Host = request.Host.Host,
-                        //Port = 443, // Force HTTPS port
                         Path = options.CallbackPath
                     }.ToString();
 
                     context.ProtocolMessage.RedirectUri = redirectUri;
-                    Console.WriteLine($"Redirect URI set to: {redirectUri}"); // Debug log
+                    Console.WriteLine($"Redirect URI set to: {redirectUri}");
                     return Task.CompletedTask;
                 }
             };
         });
-} 
+}
 else
 {
-
-    // In Development, configure a fake authentication scheme
-    builder.Services.AddAuthentication(options =>
-    {
-        options.DefaultAuthenticateScheme = "FakeAuth";
-        options.DefaultChallengeScheme = "FakeAuth";
-    }).AddScheme<AuthenticationSchemeOptions, FakeAuthHandler>("FakeAuth", options => { });
+    builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+        .AddMicrosoftIdentityWebApp(options => {
+            builder.Configuration.GetSection("AzureAd").Bind(options);
+            options.CallbackPath = "/signin-oidc";
+        });
 }
 
 builder.Services.AddControllersWithViews(options =>
@@ -84,16 +76,24 @@ builder.Services.Configure<CosmosDbSettings>(builder.Configuration.GetSection("C
 // Configure Azure Storage
 builder.Services.Configure<AzureStorageSettings>(builder.Configuration.GetSection("AzureStorage"));
 
+// Configure ServiceBus
+builder.Services.Configure<ServiceBusSettings>(builder.Configuration.GetSection("ServiceBus"));
+
 builder.Services.AddSingleton<ICosmosDbService, CosmosDbService>();
 builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
-builder.Services.AddSingleton<IQueueService, QueueService>();
+builder.Services.AddSingleton<IEventGridService, EventGridService>();
+
+// Register queue services
+builder.Services.AddSingleton<QueueService>();
+builder.Services.AddSingleton<SBQueueService>();
+
+// Register factory
+builder.Services.AddSingleton<IQueueServiceFactory, QueueServiceFactory>();
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
     if (!builder.Environment.IsDevelopment())
     {
-
-
         var keyVaultUri = builder.Configuration["KeyVault:VaultUri"] ?? "";
         var credentials = new DefaultAzureCredential();
         var secretClient = new SecretClient(new Uri(keyVaultUri), credentials);
@@ -107,6 +107,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
         return ConnectionMultiplexer.Connect(redisConnectionString ?? "localhost:6379");
     }
 });
+
 // Configure logging
 builder.Services.AddLogging(logging =>
 {
@@ -117,7 +118,7 @@ builder.Services.AddLogging(logging =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configure the HTTP request pipeline
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -141,7 +142,7 @@ app.UseAuthorization();
 
 app.UseEndpoints(app =>
 {
-    app.MapControllers(); // Added to map API controllers
+    app.MapControllers();
     app.MapControllerRoute(
         name: "default",
         pattern: "{controller=Home}/{action=Index}/{id?}");
@@ -149,26 +150,3 @@ app.UseEndpoints(app =>
 });
 
 app.Run();
-
-
-// Fake authentication handler for development
-public class FakeAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
-{
-    public FakeAuthHandler(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock)
-        : base(options, logger, encoder, clock) { }
-
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
-    {
-        // Simulate an authenticated user
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.Name, "TestUser"),
-            new Claim(ClaimTypes.NameIdentifier, "test-user-id"),
-            new Claim(ClaimTypes.Role, "User") // Add roles if needed
-        };
-        var identity = new ClaimsIdentity(claims, Scheme.Name);
-        var principal = new ClaimsPrincipal(identity);
-        var ticket = new AuthenticationTicket(principal, Scheme.Name);
-        return Task.FromResult(AuthenticateResult.Success(ticket));
-    }
-}

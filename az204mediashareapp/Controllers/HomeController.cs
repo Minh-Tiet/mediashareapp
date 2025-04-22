@@ -10,6 +10,8 @@ using System;
 using System.Text.Json;
 using System.Linq;
 using Microsoft.Azure.Cosmos;
+using MVCMediaShareAppNew.Enums;
+using Azure.Messaging.EventGrid;
 
 namespace MVCMediaShareAppNew.Controllers
 {
@@ -19,17 +21,20 @@ namespace MVCMediaShareAppNew.Controllers
         private readonly ILogger<HomeController> _logger;
         private readonly ICosmosDbService _cosmosDbService;
         private readonly IBlobStorageService _blobStorageService;
-        private readonly IQueueService _queueService;
+        private readonly IQueueServiceFactory _queueServiceFactory;
+        private readonly IEventGridService _eventGridService;
 
         public HomeController(ILogger<HomeController> logger,
             ICosmosDbService cosmosDbService,
             IBlobStorageService blobStorageService,
-            IQueueService queueService)
+            IQueueServiceFactory queueServiceFactory,
+            IEventGridService eventGridService)
         {
             _logger = logger;
             _cosmosDbService = cosmosDbService;
             _blobStorageService = blobStorageService;
-            _queueService = queueService;
+            _queueServiceFactory = queueServiceFactory;
+            _eventGridService = eventGridService;
         }
 
         public async Task<IActionResult> Index()
@@ -37,13 +42,13 @@ namespace MVCMediaShareAppNew.Controllers
             try
             {
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
-                var posts = await _cosmosDbService.GetAllBlogPostsAsync(userId);
+                var posts = await _cosmosDbService.GetAllBlogPostsAsync();
 
                 // Load comments for each post
-                foreach (var post in posts)
+                /*foreach (var post in posts)
                 {
                     post.Comments = await _cosmosDbService.GetCommentsForBlogPostAsync(post.id, userId);
-                }
+                }*/
 
                 // Sort posts by CreatedAt in descending order
                 posts = [.. posts.OrderByDescending(p => p.CreatedAt)];
@@ -96,6 +101,11 @@ namespace MVCMediaShareAppNew.Controllers
                 }
             }
 
+            if (!ModelState.IsValid)
+            {
+                return View(nameof(Index), await _cosmosDbService.GetAllBlogPostsAsync());
+            }
+
             try
             {
                 post.id = Guid.NewGuid().ToString();
@@ -103,6 +113,7 @@ namespace MVCMediaShareAppNew.Controllers
                 post.AuthorName = User.Identity?.Name ?? "anoymous";
                 post.CreatedAt = DateTime.UtcNow;
 
+                BlogPost? createdBlogPost = null;
                 if (mediaFile != null)
                 {
                     var fileName = $"{Guid.NewGuid()}_{Path.GetFileNameWithoutExtension(mediaFile.FileName)}{Path.GetExtension(mediaFile.FileName)}";
@@ -116,7 +127,8 @@ namespace MVCMediaShareAppNew.Controllers
                     post.OriginMediaName = mediaFile.FileName; // Store the original file name
 
                     var blogCreationTask = await _cosmosDbService.CreateBlogPostAsync(post);
-                    var createdBlogPost = blogCreationTask.Resource; // Retrieve the BlogPost object
+                    createdBlogPost = blogCreationTask.Resource; // Retrieve the BlogPost object
+                    _logger.LogInformation("Blog post created successfully: {Title}", createdBlogPost.Title);
 
                     // Send message to queue for image processing
                     if (!string.IsNullOrEmpty(post.MediaUrl))
@@ -131,11 +143,15 @@ namespace MVCMediaShareAppNew.Controllers
                             AuthorId = createdBlogPost.AuthorId,
                             CreatedAt = DateTime.UtcNow
                         };
-                        await _queueService.SendMessageAsync(JsonSerializer.Serialize(message));
+                        var storageQueueService = _queueServiceFactory.GetQueueService("Storage");
+                        await storageQueueService.SendMessageAsync(JsonSerializer.Serialize(message), "image-processing-queue");
+                        _logger.LogInformation("Sent message to Storage queue: image-processing-queue");
+
+                        // TODO: enqueue message to the queue for image processing
+                        var sbQueueService = _queueServiceFactory.GetQueueService("ServiceBus");
+                        await sbQueueService.SendMessageAsync(JsonSerializer.Serialize(message), "resize-queue");
+                        _logger.LogInformation("Sent message to ServiceBus queue: resize-queue");
                     }
-
-                    _logger.LogInformation("Blog post created successfully: {Title}", createdBlogPost.Title);
-
                 }
                 else if (!string.IsNullOrEmpty(selectedImageUrl))
                 {
@@ -143,7 +159,47 @@ namespace MVCMediaShareAppNew.Controllers
                     post.MediaUrl = selectedImageUrl;
                     post.MediaType = "image/jpeg"; // Default to JPEG, adjust if needed
 
-                    await _cosmosDbService.CreateBlogPostAsync(post);
+                    var blogCreationTask = await _cosmosDbService.CreateBlogPostAsync(post);
+                    createdBlogPost = blogCreationTask.Resource; // Retrieve the BlogPost object
+                    _logger.LogInformation("Blog post created successfully: {Title}", createdBlogPost.Title);
+
+                }
+                else
+                {
+                    // No media provided, save to Cosmos DB
+                    var blogCreationTask = await _cosmosDbService.CreateBlogPostAsync(post);
+                    createdBlogPost = blogCreationTask.Resource;
+                }
+
+                if (createdBlogPost != null)
+                {
+                    // Update blog post state to Published
+                    _logger.LogInformation("Blog post created successfully: {Title}", createdBlogPost.Title);
+                    createdBlogPost.State = Enum.GetName<BlogCreationState>(BlogCreationState.Published);
+                    await _cosmosDbService.UpdateBlogPostAsync(createdBlogPost);
+
+                    // Publish EventGrid event
+                    var blogPublishedEvent = new EventGridEvent(
+                        subject: $"BlogPost/{createdBlogPost.id}",
+                        eventType: "BlogCreation.Published",
+                        dataVersion: "1.0",
+                        data: new
+                        {
+                            BlogId = createdBlogPost.id,
+                            Title = createdBlogPost.Title,
+                            AuthorId = createdBlogPost.AuthorId,
+                            AuthorName = createdBlogPost.AuthorName,
+                            State = createdBlogPost.State,
+                            CreatedAt = createdBlogPost.CreatedAt,
+                            MediaUrl = createdBlogPost.MediaUrl,
+                            MediaType = createdBlogPost.MediaType
+                        })
+                    {
+                        Id = Guid.NewGuid().ToString(), // Required for Microsoft.Azure.EventGrid
+                        EventTime = DateTime.UtcNow // Required for Microsoft.Azure.EventGrid
+                    };
+                    await _eventGridService.SendEventAsync(blogPublishedEvent);
+                    _logger.LogInformation("Published EventGrid event for blog post: {BlogId}", createdBlogPost.id);
                 }
 
                 // Check if this is an AJAX request (from sidebar upload)
@@ -167,7 +223,7 @@ namespace MVCMediaShareAppNew.Controllers
             }
 
             // If we got this far, something failed; redisplay form
-            var posts = await _cosmosDbService.GetAllBlogPostsAsync(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "");
+            var posts = await _cosmosDbService.GetAllBlogPostsAsync();
             return View(nameof(Index), posts);
         }
 
@@ -190,18 +246,28 @@ namespace MVCMediaShareAppNew.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeletePost(string id)
+        public async Task<IActionResult> DeletePost(string id, string authorId)
         {
             try
             {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
-                await _cosmosDbService.DeleteBlogPostAsync(id, userId);
+
+
+                // TODO: use a feature flag to turn on/off 'delete any blog' permission
+                /*
+                 * var loggedInUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
+                if (authorId != loggedInUserId)
+                {
+                    return Json(new { success = false, message = "You are not authorized to delete this blog post." });
+                }
+                await _cosmosDbService.DeleteBlogPostAsync(id, loggedInUserId);
+                */
+                await _cosmosDbService.DeleteBlogPostAsync(id);
                 return Json(new { success = true });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting blog post with id: {Id}", id);
-                return Json(new { success = false, message = "Error deleting blog post. Please try again later." });
+                return Json(new { success = false, message = $"Error deleting blog post. Please try again later. \n Error: {ex.Message}" });
             }
         }
 
@@ -268,7 +334,7 @@ namespace MVCMediaShareAppNew.Controllers
                 }
 
                 // Get the blog post
-                var blogPost = await _cosmosDbService.GetBlogPostAsync(blogPostId, authorId);
+                var blogPost = await _cosmosDbService.GetBlogPostAsync(blogPostId);
                 if (blogPost == null)
                 {
                     return Json(new { success = false, error = "Blog post not found" });
@@ -321,6 +387,25 @@ namespace MVCMediaShareAppNew.Controllers
                 // Update the blog post with the new comment
                 await _cosmosDbService.UpdateBlogPostAsync(blogPost);
                 _logger.LogInformation("Comment added successfully to blog post: {BlogPostId}", blogPostId);
+                
+                // TODO: publish event to event grid to notify a comment is added
+                var commentEvent = new EventGridEvent(
+                    subject: $"Comment/{comment.Id}",
+                    eventType: "Comment.Added",
+                    dataVersion: "1.0", // Data version
+                    data: new
+                    {
+                        CommentId = comment.Id,
+                        BlogPostId = blogPostId,
+                        AuthorId = authorId,
+                        AuthorName = comment.AuthorName,
+                        Text = comment.Text,
+                        MediaUrl = comment.MediaUrl,
+                        CreatedAt = comment.CreatedAt
+                    }
+                );
+                await _eventGridService.SendEventAsync(commentEvent);
+                _logger.LogInformation("Published EventGrid event for comment: {CommentId}", comment.Id);
 
                 return Json(new { success = true, comment = comment });
             }
@@ -417,6 +502,77 @@ namespace MVCMediaShareAppNew.Controllers
             {
                 _logger.LogError(ex, "Error deleting user media");
                 return Json(new { success = false, message = "Error deleting media" });
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleLike(string blogPostId)
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Json(new { success = false, message = "User not authenticated" });
+                }
+
+                // Get the blog post
+                var blogPost = await _cosmosDbService.GetBlogPostAsync(blogPostId);
+                if (blogPost == null)
+                {
+                    return Json(new { success = false, message = "Blog post not found" });
+                }
+
+                bool isLiked = blogPost.LikedBy.Contains(userId);
+                if (isLiked)
+                {
+                    // Unlike: Remove user from LikedBy and decrement LikeCount
+                    blogPost.LikedBy.Remove(userId);
+                    blogPost.LikeCount = Math.Max(0, blogPost.LikeCount - 1);
+                }
+                else
+                {
+                    // Like: Add user to LikedBy and increment LikeCount
+                    blogPost.LikedBy.Add(userId);
+                    blogPost.LikeCount++;
+                }
+
+                // Update the blog post in Cosmos DB
+                await _cosmosDbService.UpdateBlogPostAsync(blogPost);
+                _logger.LogInformation("{Action} blog post {BlogPostId} by user {UserId}", isLiked ? "Unliked" : "Liked", blogPostId, userId);
+
+                // Publish EventGrid event
+                var likeEvent = new EventGridEvent(
+                    subject: $"BlogPost/{blogPostId}/Like",
+                    eventType: isLiked ? "BlogPost.Unliked" : "BlogPost.Liked",
+                    dataVersion: "1.0",
+                    data: new
+                    {
+                        BlogId = blogPostId,
+                        UserId = userId,
+                        LikeCount = blogPost.LikeCount,
+                        Action = isLiked ? "Unliked" : "Liked",
+                        Timestamp = DateTime.UtcNow
+                    })
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    EventTime = DateTime.UtcNow
+                };
+                await _eventGridService.SendEventAsync(likeEvent);
+                _logger.LogInformation("Published EventGrid event for {Action} on blog post: {BlogId}", isLiked ? "unlike" : "like", blogPostId);
+
+                return Json(new
+                {
+                    success = true,
+                    likeCount = blogPost.LikeCount,
+                    isLiked = !isLiked
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error toggling like for blog post {BlogPostId}", blogPostId);
+                return Json(new { success = false, message = "Error updating like. Please try again later." });
             }
         }
     }
