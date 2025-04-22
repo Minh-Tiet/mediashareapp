@@ -246,18 +246,28 @@ namespace MVCMediaShareAppNew.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeletePost(string id)
+        public async Task<IActionResult> DeletePost(string id, string authorId)
         {
             try
             {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
-                await _cosmosDbService.DeleteBlogPostAsync(id, userId);
+
+
+                // TODO: use a feature flag to turn on/off 'delete any blog' permission
+                /*
+                 * var loggedInUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
+                if (authorId != loggedInUserId)
+                {
+                    return Json(new { success = false, message = "You are not authorized to delete this blog post." });
+                }
+                await _cosmosDbService.DeleteBlogPostAsync(id, loggedInUserId);
+                */
+                await _cosmosDbService.DeleteBlogPostAsync(id);
                 return Json(new { success = true });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting blog post with id: {Id}", id);
-                return Json(new { success = false, message = "Error deleting blog post. Please try again later." });
+                return Json(new { success = false, message = $"Error deleting blog post. Please try again later. \n Error: {ex.Message}" });
             }
         }
 

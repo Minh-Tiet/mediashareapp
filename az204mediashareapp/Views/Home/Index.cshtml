@@ -182,7 +182,7 @@
                                                 <i class="@(post.LikedBy.Contains(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "") ? "fas fa-heart" : "far fa-heart") me-1"></i>
                                                 <span class="like-count">@post.LikeCount</span> Like@(post.LikeCount == 1 ? "" : "s")
                                             </button>
-                                            <button class="btn btn-outline-danger btn-sm delete-post" data-blog-id="@post.id" data-blog-title="@post.Title">
+                                            <button class="btn btn-outline-danger btn-sm delete-post" data-blog-id="@post.id" data-author-id="@post.AuthorId" data-blog-title="@post.Title">
                                                 <i class="fas fa-trash-alt"></i> Delete
                                             </button>
                                         </div>
@@ -710,6 +710,7 @@
             // Handle blog post deletion
             $(document).on('click', '.delete-post', function() {
                 const blogId = $(this).data('blog-id');
+                const authorId = $(this).data('author-id');
                 const blogTitle = $(this).data('blog-title');
                 
                 if (confirm(`Are you sure you want to delete the post "${blogTitle}"? This action cannot be undone.`)) {
@@ -718,7 +719,7 @@
                     $.ajax({
                         url: '/Home/DeletePost',
                         type: 'POST',
-                        data: { id: blogId },
+                        data: { id: blogId, authorId: authorId },
                         headers: {
                             'RequestVerificationToken': token
                         },

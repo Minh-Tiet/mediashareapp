@@ -14,6 +14,7 @@ namespace MVCMediaShareAppNew.Services
         Task<ItemResponse<BlogPost>> CreateBlogPostAsync(BlogPost blogPost);
         Task UpdateBlogPostAsync(BlogPost blogPost);
         Task DeleteBlogPostAsync(string id, string authorId);
+        Task DeleteBlogPostAsync(string id);
         Task DeleteAllBlogPostsAsync(string userId);
         Task<List<Comment>> GetCommentsForBlogPostAsync(string blogPostId, string currentUserId);
         Task<List<UserImage>> GetUserImagesAsync(string userId);
@@ -140,10 +141,39 @@ namespace MVCMediaShareAppNew.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting blog post: {Id}", id);
-                throw;
+                throw new Exception(ex.Message);
             }
         }
 
+        public async Task DeleteBlogPostAsync(string id)
+        {
+            try
+            {
+                // Query to find the item by id (cross-partition query)
+                var query = new QueryDefinition("SELECT * FROM c WHERE c.id = @id")
+                    .WithParameter("@id", id);
+                var iterator = _container.GetItemQueryIterator<BlogPost>(query);
+
+                // Retrieve the item
+                while (iterator.HasMoreResults)
+                {
+                    var response = await iterator.ReadNextAsync();
+                    var item = response.FirstOrDefault();
+                    if (item != null)
+                    {
+                        // Extract AuthorId (adjust based on your document structure)
+                        string authorId = item.AuthorId;
+                        // Delete the item using id and partition key
+                        await DeleteBlogPostAsync(id, authorId);
+                        return;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
         public async Task DeleteAllBlogPostsAsync(string userId)
         {
             var query = new QueryDefinition("SELECT * FROM c WHERE c.AuthorId = @userId")
