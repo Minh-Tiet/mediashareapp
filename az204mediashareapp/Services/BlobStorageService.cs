@@ -25,6 +25,7 @@ namespace MVCMediaShareAppNew.Services
         private readonly IDatabase _redisDb;
         private readonly string _sasTokenCacheKey;
         private readonly string _containerName;
+        private readonly int _containerSasExpiredInDays;
 
         public BlobStorageService(
             IOptions<AzureStorageSettings> settings,
@@ -48,6 +49,7 @@ namespace MVCMediaShareAppNew.Services
                 _redisDb = redis.GetDatabase();
                 _containerName = configuration["AzureStorage:ContainerName"] ?? "";
                 _sasTokenCacheKey = configuration["Redis:BlobContainerSasTokenKey"] ?? "";
+                _containerSasExpiredInDays = int.Parse(configuration["AzureStorage:ContainerSasExpiredInDays"] ?? "7");
             }
             catch (Exception ex)
             {
@@ -136,7 +138,7 @@ namespace MVCMediaShareAppNew.Services
 
                 // Generate a new SAS token if not in cache or expired
                 BlobContainerSasPermissions permissions = BlobContainerSasPermissions.Read;
-                DateTimeOffset expiryTimeNew = DateTimeOffset.UtcNow.AddHours(24);
+                DateTimeOffset expiryTimeNew = DateTimeOffset.UtcNow.AddDays(_containerSasExpiredInDays);
 
                 string sasToken = _containerClient.GenerateSasUri(
                     permissions: permissions,

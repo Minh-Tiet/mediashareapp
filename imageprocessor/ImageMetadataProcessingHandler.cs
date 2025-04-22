@@ -9,20 +9,20 @@ using ImageProcessor.Services;
 
 namespace ImageProcessor
 {
-    public class ImageProcessingHandler
+    public class ImageMetadataProcessingHandler
     {
-        private readonly ILogger<ImageProcessingHandler> _logger;
+        private readonly ILogger<ImageMetadataProcessingHandler> _logger;
         private readonly ICosmosDbService _cosmosDbService;
 
-        public ImageProcessingHandler(
-            ILogger<ImageProcessingHandler> logger,
+        public ImageMetadataProcessingHandler(
+            ILogger<ImageMetadataProcessingHandler> logger,
             ICosmosDbService cosmosDbService)
         {
             _logger = logger;
             _cosmosDbService = cosmosDbService;
         }
 
-        [Function(nameof(ImageProcessingHandler))]
+        [Function(nameof(ImageMetadataProcessingHandler))]
         public async Task Run([QueueTrigger("%QueueName%", Connection = "StorageConnection")] string message)
         {
             try

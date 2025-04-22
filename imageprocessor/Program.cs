@@ -18,7 +18,7 @@ builder.ConfigureFunctionsWebApplication();
 builder.Services.AddLogging(logging =>
 {
     logging.AddConsole();
-    logging.SetMinimumLevel(LogLevel.Debug);
+    logging.SetMinimumLevel(LogLevel.Information);
 });
 // Application Insights isn't enabled by default. See https://aka.ms/AAt8mw4.
 // builder.Services

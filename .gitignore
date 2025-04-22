@@ -22,3 +22,8 @@ imageprocessor/obj/Release/*
 /az204mediashareapp/Properties/serviceDependencies.local.json
 /az204mediashareapp/az204mediashareapp.zip
 /imageprocessor/obj/Debug/net8.0/ImageProcessor.assets.cache
+/imageprocessor/obj/ImageProcessor.csproj.nuget.dgspec.json
+/imageprocessor/obj/ImageProcessor.csproj.nuget.g.props
+/imageprocessor/obj/ImageProcessor.csproj.nuget.g.targets
+/imageprocessor/obj/project.assets.json
+/imageprocessor/obj/Debug/net8.0/ImageProcessor.GlobalUsings.g.cs
