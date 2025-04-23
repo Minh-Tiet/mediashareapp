@@ -12,6 +12,7 @@ using System.Linq;
 using Microsoft.Azure.Cosmos;
 using MVCMediaShareAppNew.Enums;
 using Azure.Messaging.EventGrid;
+using Microsoft.FeatureManagement;
 
 namespace MVCMediaShareAppNew.Controllers
 {
@@ -23,18 +24,22 @@ namespace MVCMediaShareAppNew.Controllers
         private readonly IBlobStorageService _blobStorageService;
         private readonly IQueueServiceFactory _queueServiceFactory;
         private readonly IEventGridService _eventGridService;
+        // App Configuration
+        private readonly IFeatureManager _featureManager;
 
         public HomeController(ILogger<HomeController> logger,
             ICosmosDbService cosmosDbService,
             IBlobStorageService blobStorageService,
             IQueueServiceFactory queueServiceFactory,
-            IEventGridService eventGridService)
+            IEventGridService eventGridService,
+            IFeatureManager featureManager)
         {
             _logger = logger;
             _cosmosDbService = cosmosDbService;
             _blobStorageService = blobStorageService;
             _queueServiceFactory = queueServiceFactory;
             _eventGridService = eventGridService;
+            _featureManager = featureManager;
         }
 
         public async Task<IActionResult> Index()
@@ -43,12 +48,6 @@ namespace MVCMediaShareAppNew.Controllers
             {
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
                 var posts = await _cosmosDbService.GetAllBlogPostsAsync();
-
-                // Load comments for each post
-                /*foreach (var post in posts)
-                {
-                    post.Comments = await _cosmosDbService.GetCommentsForBlogPostAsync(post.id, userId);
-                }*/
 
                 // Sort posts by CreatedAt in descending order
                 posts = [.. posts.OrderByDescending(p => p.CreatedAt)];
@@ -250,9 +249,20 @@ namespace MVCMediaShareAppNew.Controllers
         {
             try
             {
-
-
                 // TODO: use a feature flag to turn on/off 'delete any blog' permission
+                if (await _featureManager.IsEnabledAsync("AllowBlogDeletionAny"))
+                {
+                    await _cosmosDbService.DeleteBlogPostAsync(id);
+                }
+                else
+                {
+                    var loggedInUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
+                    if (authorId != loggedInUserId)
+                    {
+                        return Json(new { success = false, message = "You are not authorized to delete this blog post." });
+                    }
+                    await _cosmosDbService.DeleteBlogPostAsync(id, loggedInUserId);
+                }
                 /*
                  * var loggedInUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
                 if (authorId != loggedInUserId)
@@ -261,7 +271,7 @@ namespace MVCMediaShareAppNew.Controllers
                 }
                 await _cosmosDbService.DeleteBlogPostAsync(id, loggedInUserId);
                 */
-                await _cosmosDbService.DeleteBlogPostAsync(id);
+                
                 return Json(new { success = true });
             }
             catch (Exception ex)
