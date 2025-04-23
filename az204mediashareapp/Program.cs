@@ -3,7 +3,9 @@ using Azure.Security.KeyVault.Secrets;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Logging;
+using Microsoft.FeatureManagement;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
 using MVCMediaShareAppNew.Models;
@@ -56,6 +58,25 @@ else
         });
 }
 
+builder.Configuration.AddAzureAppConfiguration(options =>
+{
+    // Use Azure App Configuration
+    var endpoint = builder.Configuration["AppConfiguration:Endpoint"];
+    var connectionString = builder.Configuration["AppConfiguration:ConnectionString"];
+    var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
+    {
+        ManagedIdentityClientId = builder.Configuration["ManagedIdentityClientId"]
+    });
+    options.Connect(new Uri(endpoint), credential)
+    .ConfigureKeyVault(kv => kv.SetCredential(credential))
+    .Select(KeyFilter.Any, LabelFilter.Null)
+        .ConfigureRefresh(refresh =>
+        {
+            refresh.Register("AppConfig:Sentinel", refreshAll: true)
+                .SetCacheExpiration(TimeSpan.FromSeconds(30));
+        });
+});
+
 builder.Services.AddControllersWithViews(options =>
 {
     if (!builder.Environment.IsDevelopment())
@@ -107,6 +128,10 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
         return ConnectionMultiplexer.Connect(redisConnectionString ?? "localhost:6379");
     }
 });
+
+// Add Feature Management
+builder.Services.AddFeatureManagement();
+builder.Services.AddAzureAppConfiguration();
 
 // Configure logging
 builder.Services.AddLogging(logging =>
