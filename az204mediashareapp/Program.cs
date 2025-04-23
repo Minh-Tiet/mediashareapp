@@ -141,6 +141,9 @@ builder.Services.AddLogging(logging =>
     logging.SetMinimumLevel(LogLevel.Information);
 });
 
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
@@ -173,5 +176,11 @@ app.UseEndpoints(app =>
         pattern: "{controller=Home}/{action=Index}/{id?}");
     app.MapRazorPages();
 });
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.Run();
