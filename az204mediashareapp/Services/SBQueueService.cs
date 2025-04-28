@@ -1,6 +1,6 @@
 ﻿using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Options;
-using MVCMediaShareAppNew.Models;
+using MVCMediaShareAppNew.Models.SettingsModels;
 
 namespace MVCMediaShareAppNew.Services
 {

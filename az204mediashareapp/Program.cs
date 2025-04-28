@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.FeatureManagement;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
-using MVCMediaShareAppNew.Models;
+using MVCMediaShareAppNew.Models.SettingsModels;
 using MVCMediaShareAppNew.Services;
 using StackExchange.Redis;
 

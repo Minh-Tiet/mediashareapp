@@ -2,7 +2,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
 using Microsoft.Extensions.Options;
-using MVCMediaShareAppNew.Models;
+using MVCMediaShareAppNew.Models.SettingsModels;
 using StackExchange.Redis;
 using System.Web;
 
@@ -13,7 +13,11 @@ namespace MVCMediaShareAppNew.Services
         Task<string> UploadFileAsync(IFormFile file, string fileName);
         string GetBlobUrlAsync(string blobName);
         Task DeleteBlobAsync(string blobName);
-        string GetSasToken();
+        string GetSasTokenFromRedisCache();
+        Task<string> GetSasTokenForBlobAsync(string blobName);
+        bool HasSasToken(string blobUri);
+        string RemoveSasFromBlobPath(string fullBlobPath);
+        string ExtractBlobNameFromUrl(string blobUrl);
     }
 
     public class BlobStorageService : IBlobStorageService
@@ -26,6 +30,7 @@ namespace MVCMediaShareAppNew.Services
         private readonly string _sasTokenCacheKey;
         private readonly string _containerName;
         private readonly int _containerSasExpiredInDays;
+        private readonly int _blobItemSasExpiredInMinutes;
 
         public BlobStorageService(
             IOptions<AzureStorageSettings> settings,
@@ -50,6 +55,7 @@ namespace MVCMediaShareAppNew.Services
                 _containerName = configuration["AzureStorage:ContainerName"] ?? "";
                 _sasTokenCacheKey = configuration["Redis:BlobContainerSasTokenKey"] ?? "";
                 _containerSasExpiredInDays = int.Parse(configuration["AzureStorage:ContainerSasExpiredInDays"] ?? "7");
+                _blobItemSasExpiredInMinutes = int.Parse(configuration["AzureStorage:BlobItemSasExpiredInMinutes"] ?? "1");
             }
             catch (Exception ex)
             {
@@ -105,7 +111,7 @@ namespace MVCMediaShareAppNew.Services
             }
         }
 
-        public string GetSasToken()
+        public string GetSasTokenFromRedisCache()
         {
             try
             {
@@ -161,6 +167,34 @@ namespace MVCMediaShareAppNew.Services
             }
         }
 
+        public Task<string> GetSasTokenForBlobAsync(string blobNameOrBlobUrl)
+        {
+            try
+            {
+                var containerClient = _blobServiceClient.GetBlobContainerClient(_containerName);
+                Uri blobUri = new Uri(blobNameOrBlobUrl);
+                BlobUriBuilder blobUriBuilder = new BlobUriBuilder(blobUri);
+                string blobName = blobUriBuilder.BlobName;
+                var blobClient = containerClient.GetBlobClient(blobName);
+                // Generate a SAS token for the blob
+                BlobSasBuilder sasBuilder = new BlobSasBuilder
+                {
+                    BlobContainerName = _containerName,
+                    BlobName = blobName,
+                    Resource = "b",
+                    ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(_blobItemSasExpiredInMinutes)
+                };
+                sasBuilder.SetPermissions(BlobSasPermissions.Read);
+                string sasToken = blobClient.GenerateSasUri(sasBuilder).ToString();
+                return Task.FromResult(sasToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating SAS token for blob: {BlobName}", blobNameOrBlobUrl);
+                throw;
+            }
+        }
+
         public async Task DeleteBlobAsync(string blobName)
         {
             try
@@ -174,6 +208,63 @@ namespace MVCMediaShareAppNew.Services
             {
                 _logger.LogError(ex, "Error deleting blob: {BlobName}", blobName);
                 throw;
+            }
+        }
+
+        public bool HasSasToken(string blobUri)
+        {
+            if (string.IsNullOrEmpty(blobUri))
+                return false;
+
+            try
+            {
+                var uri = new Uri(blobUri);
+                // Check if the URI has a query string
+                if (string.IsNullOrEmpty(uri.Query))
+                    return false;
+
+                // Common SAS token parameters: sig (signature), st (start time), se (expiry time), sp (permissions), etc.
+                var queryParameters = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                return queryParameters.AllKeys.Any(key => key == "sig" || key == "st" || key == "se" || key == "sp");
+            }
+            catch (UriFormatException)
+            {
+                // Handle invalid URI
+                return false;
+            }
+        }
+
+        public string RemoveSasFromBlobPath(string blobUri)
+        {
+            if (string.IsNullOrEmpty(blobUri))
+                return null;
+
+            try
+            {
+                var uriBuilder = new UriBuilder(blobUri);
+                uriBuilder.Query = string.Empty; // Remove query string
+                return uriBuilder.Uri.ToString();
+            }
+            catch (UriFormatException)
+            {
+                return null;
+            }
+        }
+
+        public string ExtractBlobNameFromUrl(string blobUrl)
+        {
+            if (string.IsNullOrEmpty(blobUrl))
+                return null;
+
+            try
+            {
+                var blobUriBuilder = new BlobUriBuilder(new Uri(blobUrl));
+                // BlobName includes the blob name, SAS token is ignored
+                return blobUriBuilder.BlobName;
+            }
+            catch (UriFormatException)
+            {
+                return null;
             }
         }
     }

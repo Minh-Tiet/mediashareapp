@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MVCMediaShareAppNew.Models;
 using MVCMediaShareAppNew.Services;
 using Microsoft.AspNetCore.Http;
 using System.IO;
@@ -13,6 +12,8 @@ using Microsoft.Azure.Cosmos;
 using MVCMediaShareAppNew.Enums;
 using Azure.Messaging.EventGrid;
 using Microsoft.FeatureManagement;
+using MVCMediaShareAppNew.Models.ViewModels;
+using MVCMediaShareAppNew.Models.DbModels;
 
 namespace MVCMediaShareAppNew.Controllers
 {
@@ -49,10 +50,17 @@ namespace MVCMediaShareAppNew.Controllers
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
                 var posts = await _cosmosDbService.GetAllBlogPostsAsync();
 
-                // Sort posts by CreatedAt in descending order
-                posts = [.. posts.OrderByDescending(p => p.CreatedAt)];
+                var response = posts.Where(p => p.MediaBlobUrl != null).OrderByDescending(p => p.CreatedAt).ToList();
+                response.ForEach(async blob =>
+                {
+                    blob.MediaBlobUrl = await CheckAndAssignSasToken(blob.MediaBlobUrl);
+                    blob.Comments.ForEach(async c =>
+                    {
+                        c.MediaBlobUrl = await CheckAndAssignSasToken(c.MediaBlobUrl);
+                    });
+                });
 
-                return View(posts);
+                return View(response);
             }
             catch (Exception ex)
             {
@@ -119,9 +127,16 @@ namespace MVCMediaShareAppNew.Controllers
                     string baseMediaUrl = await _blobStorageService.UploadFileAsync(mediaFile, fileName);
                     post.MediaType = mediaFile.ContentType;
 
-                    // Generate container-level SAS token and append it to the base URL
-                    string sasToken = _blobStorageService.GetSasToken();
-                    post.MediaUrl = $"{baseMediaUrl}{sasToken}"; // Append SAS token to the URL
+                    if (await _featureManager.IsEnabledAsync(Enum.GetName(ConfigFeatureFlags.StoreBlobItemWithSas)))
+                    {
+                        // Generate container-level SAS token and append it to the base URL
+                        string sasToken = _blobStorageService.GetSasTokenFromRedisCache();
+                        post.MediaBlobUrl = $"{baseMediaUrl}{sasToken}"; // Append SAS token to the URL
+                    }
+                    else
+                    {
+                        post.MediaBlobUrl = baseMediaUrl; // Use the base URL without SAS token
+                    }
                     post.MediaBlobName = fileName; // Store the base URL for later use
                     post.OriginMediaName = mediaFile.FileName; // Store the original file name
 
@@ -130,14 +145,14 @@ namespace MVCMediaShareAppNew.Controllers
                     _logger.LogInformation("Blog post created successfully: {Title}", createdBlogPost.Title);
 
                     // Send message to queue for image processing
-                    if (!string.IsNullOrEmpty(post.MediaUrl))
+                    if (!string.IsNullOrEmpty(post.MediaBlobUrl))
                     {
                         var message = new
                         {
                             id = Guid.NewGuid().ToString(),
                             OriginMediaName = createdBlogPost.OriginMediaName,
                             MediaStorageBlobName = createdBlogPost.MediaBlobName,
-                            MediaStorageBlobUrlWithSas = createdBlogPost.MediaUrl,
+                            MediaStorageBlobUrl = createdBlogPost.MediaBlobUrl,
                             MediaType = createdBlogPost.MediaType,
                             AuthorId = createdBlogPost.AuthorId,
                             CreatedAt = DateTime.UtcNow
@@ -154,8 +169,8 @@ namespace MVCMediaShareAppNew.Controllers
                 }
                 else if (!string.IsNullOrEmpty(selectedImageUrl))
                 {
-                    // Use the selected image from the sidebar
-                    post.MediaUrl = selectedImageUrl;
+                    post.MediaBlobUrl = selectedImageUrl; // Use the selected image URL
+                    post.MediaBlobName = _blobStorageService.ExtractBlobNameFromUrl(selectedImageUrl); // Extract the blob name from the URL
                     post.MediaType = "image/jpeg"; // Default to JPEG, adjust if needed
 
                     var blogCreationTask = await _cosmosDbService.CreateBlogPostAsync(post);
@@ -190,7 +205,7 @@ namespace MVCMediaShareAppNew.Controllers
                             AuthorName = createdBlogPost.AuthorName,
                             State = createdBlogPost.State,
                             CreatedAt = createdBlogPost.CreatedAt,
-                            MediaUrl = createdBlogPost.MediaUrl,
+                            MediaUrl = createdBlogPost.MediaBlobUrl,
                             MediaType = createdBlogPost.MediaType
                         })
                     {
@@ -204,7 +219,7 @@ namespace MVCMediaShareAppNew.Controllers
                 // Check if this is an AJAX request (from sidebar upload)
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
                 {
-                    return Json(new { success = true, imageUrl = post.MediaUrl });
+                    return Json(new { success = true, imageUrl = post.MediaBlobUrl });
                 }
 
                 return RedirectToAction(nameof(Index));
@@ -250,7 +265,7 @@ namespace MVCMediaShareAppNew.Controllers
             try
             {
                 // TODO: use a feature flag to turn on/off 'delete any blog' permission
-                if (await _featureManager.IsEnabledAsync("AllowBlogDeletionAny"))
+                if (await _featureManager.IsEnabledAsync(Enum.GetName(ConfigFeatureFlags.AllowBlogDeletionAny)))
                 {
                     await _cosmosDbService.DeleteBlogPostAsync(id);
                 }
@@ -271,7 +286,7 @@ namespace MVCMediaShareAppNew.Controllers
                 }
                 await _cosmosDbService.DeleteBlogPostAsync(id, loggedInUserId);
                 */
-                
+
                 return Json(new { success = true });
             }
             catch (Exception ex)
@@ -297,24 +312,23 @@ namespace MVCMediaShareAppNew.Controllers
                 }
 
                 var mediaStores = await _cosmosDbService.GetAllMediaItemsAsync(userId);
-                
                 // Convert media items to UserImage models, only including posts with media
                 var images = mediaStores
-                    .Where(mediaItem => !string.IsNullOrEmpty(mediaItem.MediaStorageBlobUrlWithSas) && mediaItem.MediaType?.StartsWith("image/") == true)
-                    .Select(mediaItem => new UserImage
+                    .OrderByDescending(img => img.CreatedAt)
+                    .Where(mediaItem => mediaItem.MediaType?.StartsWith("image/") == true)
+                    .Select(async mediaItem => new UserImage
                     {
                         Id = mediaItem.id,
                         UserId = userId,
                         UserName = User.Identity?.Name ?? "Anonymous",
-                        ImageUrlWithSas = mediaItem.MediaStorageBlobUrlWithSas,
                         OriginMediaName = mediaItem.OriginMediaName,
                         ImageBlogName = mediaItem.MediaStorageBlobName,
+                        ImageUrlWithSas = await CheckAndAssignSasToken(mediaItem.MediaStorageBlobUrl),
                         CreatedAt = mediaItem.CreatedAt
-                    })
-                    .OrderByDescending(img => img.CreatedAt)
-                    .ToList();
+                    });
+                var response = await Task.WhenAll(images); // Wait for all tasks to complete
 
-                return View(images);
+                return View(response.ToList());
             }
             catch (Exception ex)
             {
@@ -378,16 +392,24 @@ namespace MVCMediaShareAppNew.Controllers
 
                     var fileName = $"comments/{Guid.NewGuid()}{Path.GetExtension(mediaFile.FileName)}";
                     string baseMediaUrl = await _blobStorageService.UploadFileAsync(mediaFile, fileName);
+                    comment.MediaBlobName = fileName; // Store the blob name for later use
                     comment.MediaType = mediaFile.ContentType;
 
-                    // Generate container-level SAS token and append it to the base URL
-                    string sasToken = _blobStorageService.GetSasToken();
-                    comment.MediaUrl = $"{baseMediaUrl}{sasToken}"; // Append SAS token to the URL
+                    if (await _featureManager.IsEnabledAsync(Enum.GetName(ConfigFeatureFlags.StoreBlobItemWithSas)))
+                    {
+                        // Generate container-level SAS token and append it to the base URL
+                        string sasToken = _blobStorageService.GetSasTokenFromRedisCache();
+                        comment.MediaBlobUrl = $"{baseMediaUrl}{sasToken}"; // Append SAS token to the URL
+                    }
+                    else
+                    {
+                        comment.MediaBlobUrl = baseMediaUrl; // Use the base URL without SAS token
+                    }
                 }
                 else if (!string.IsNullOrEmpty(selectedImageUrl))
                 {
-                    // Use the selected image from the sidebar
-                    comment.MediaUrl = selectedImageUrl;
+                    comment.MediaBlobUrl = selectedImageUrl;
+                    comment.MediaBlobName = _blobStorageService.ExtractBlobNameFromUrl(selectedImageUrl); // Extract the blob name from the URL
                     comment.MediaType = "image/jpeg"; // Default to JPEG, adjust if needed
                 }
 
@@ -397,7 +419,7 @@ namespace MVCMediaShareAppNew.Controllers
                 // Update the blog post with the new comment
                 await _cosmosDbService.UpdateBlogPostAsync(blogPost);
                 _logger.LogInformation("Comment added successfully to blog post: {BlogPostId}", blogPostId);
-                
+
                 // TODO: publish event to event grid to notify a comment is added
                 var commentEvent = new EventGridEvent(
                     subject: $"Comment/{comment.Id}",
@@ -410,7 +432,7 @@ namespace MVCMediaShareAppNew.Controllers
                         AuthorId = authorId,
                         AuthorName = comment.AuthorName,
                         Text = comment.Text,
-                        MediaUrl = comment.MediaUrl,
+                        MediaUrl = comment.MediaBlobUrl,
                         CreatedAt = comment.CreatedAt
                     }
                 );
@@ -433,6 +455,12 @@ namespace MVCMediaShareAppNew.Controllers
             {
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
                 var comments = await _cosmosDbService.GetCommentsForBlogPostAsync(blogPostId, userId);
+
+                comments.ForEach(async c =>
+                {
+                    c.MediaBlobUrl = await CheckAndAssignSasToken(c.MediaBlobUrl);
+                });
+
                 return PartialView("_CommentsList", comments);
             }
             catch (Exception ex)
@@ -454,24 +482,22 @@ namespace MVCMediaShareAppNew.Controllers
                 }
 
                 var mediaStores = await _cosmosDbService.GetAllMediaItemsAsync(userId);
-                
                 // Convert media item to UserImage models, only including posts with media
                 var images = mediaStores
-                    .Where(mediaItem => !string.IsNullOrEmpty(mediaItem.MediaStorageBlobUrlWithSas) && mediaItem.MediaType?.StartsWith("image/") == true)
-                    .Select(mediaItem => new UserImage
+                    .OrderByDescending(img => img.CreatedAt)
+                    .Where(mediaItem => mediaItem.MediaType?.StartsWith("image/") == true)
+                    .Select(async mediaItem => new UserImage
                     {
                         Id = mediaItem.id,
                         UserId = userId,
                         UserName = User.Identity?.Name ?? "Anonymous",
-                        ImageUrlWithSas = mediaItem.MediaStorageBlobUrlWithSas,
+                        ImageUrlWithSas = await CheckAndAssignSasToken(mediaItem.MediaStorageBlobUrl),
                         OriginMediaName = mediaItem.OriginMediaName,
                         ImageBlogName = mediaItem.MediaStorageBlobName,
                         CreatedAt = mediaItem.CreatedAt
-                    })
-                    .OrderByDescending(img => img.CreatedAt)
-                    .ToList();
-
-                return Json(images);
+                    });
+                var response = await Task.WhenAll(images); // Wait for all tasks to complete
+                return Json(response.ToList());
             }
             catch (Exception ex)
             {
@@ -494,7 +520,7 @@ namespace MVCMediaShareAppNew.Controllers
                 // Get the media item to get the blob name
                 var mediaItems = await _cosmosDbService.GetAllMediaItemsAsync(userId);
                 var mediaItem = mediaItems.FirstOrDefault(m => m.id == id);
-                
+
                 if (mediaItem == null)
                 {
                     return Json(new { success = false, message = "Media item not found" });
@@ -583,6 +609,40 @@ namespace MVCMediaShareAppNew.Controllers
             {
                 _logger.LogError(ex, "Error toggling like for blog post {BlogPostId}", blogPostId);
                 return Json(new { success = false, message = "Error updating like. Please try again later." });
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="blobUrl"></param>
+        /// <returns></returns>
+        async Task<string> CheckAndAssignSasToken(string blobUrl)
+        {
+            var storeSasFeatureEnabled = await _featureManager.IsEnabledAsync(Enum.GetName(ConfigFeatureFlags.StoreBlobItemWithSas));
+
+            if (storeSasFeatureEnabled)
+            {
+                if (!string.IsNullOrEmpty(blobUrl) && !_blobStorageService.HasSasToken(blobUrl))
+                {
+                    var sasTokenFromCache = _blobStorageService.GetSasTokenFromRedisCache();
+                    return $"{blobUrl}{sasTokenFromCache}";
+                }
+                else
+                {
+                    return blobUrl;
+                }
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(blobUrl) && !_blobStorageService.HasSasToken(blobUrl))
+                {
+                    return await _blobStorageService.GetSasTokenForBlobAsync(blobUrl);
+                }
+                else
+                {
+                    return blobUrl;
+                }
             }
         }
     }

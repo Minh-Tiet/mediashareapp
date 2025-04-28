@@ -1,6 +1,6 @@
 using Azure.Storage.Queues;
 using Microsoft.Extensions.Options;
-using MVCMediaShareAppNew.Models;
+using MVCMediaShareAppNew.Models.SettingsModels;
 using System.Text.Json;
 
 namespace MVCMediaShareAppNew.Services

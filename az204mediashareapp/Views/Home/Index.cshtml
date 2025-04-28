@@ -1,6 +1,7 @@
 ﻿@using System.Security.Claims;
+@using MVCMediaShareAppNew.Models.DbModels
 
-@model IEnumerable<MVCMediaShareAppNew.Models.BlogPost>
+@model IEnumerable<BlogPost>
 
 @{
     ViewData["Title"] = "Blog Posts";
@@ -149,17 +150,17 @@
                         <div class="col-12 mb-4">
                             <div class="card">
                                 <div class="card-body">
-                                    @if (!string.IsNullOrEmpty(post.MediaUrl))
+                                    @if (!string.IsNullOrEmpty(post.MediaBlobUrl))
                                     {
                                         <div class="text-center mb-3">
                                             @if (post.MediaType?.StartsWith("image/") == true)
                                             {
-                                                <img src="@post.MediaUrl" class="img-fluid rounded" alt="@post.Title" style="max-height: 400px; object-fit: contain;">
+                                                <img src="@post.MediaBlobUrl" class="img-fluid rounded" alt="@post.Title" style="max-height: 400px; object-fit: contain;">
                                             }
                                             else if (post.MediaType?.StartsWith("video/") == true)
                                             {
                                                 <video class="img-fluid rounded" controls style="max-height: 400px; object-fit: contain;">
-                                                    <source src="@post.MediaUrl" type="@post.MediaType">
+                                                    <source src="@post.MediaBlobUrl" type="@post.MediaType">
                                                     Your browser does not support the video tag.
                                                 </video>
                                             }
@@ -203,16 +204,16 @@
                                                         <div class="card mb-2">
                                                             <div class="card-body">
                                                                 <p class="card-text">@comment.Text</p>
-                                                                @if (!string.IsNullOrEmpty(comment.MediaUrl))
+                                                                @if (!string.IsNullOrEmpty(comment.MediaBlobUrl))
                                                                 {
                                                                     @if (comment.MediaType?.StartsWith("image/") == true)
                                                                     {
-                                                                        <img src="@comment.MediaUrl" class="img-fluid rounded" style="max-height: 200px;">
+                                                                        <img src="@comment.MediaBlobUrl" class="img-fluid rounded" style="max-height: 200px;">
                                                                     }
                                                                     else if (comment.MediaType?.StartsWith("video/") == true)
                                                                     {
                                                                         <video controls class="img-fluid rounded" style="max-height: 200px;">
-                                                                            <source src="@comment.MediaUrl" type="@comment.MediaType">
+                                                                            <source src="@comment.MediaBlobUrl" type="@comment.MediaType">
                                                                             Your browser does not support the video tag.
                                                                         </video>
                                                                     }

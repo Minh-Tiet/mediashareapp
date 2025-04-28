@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 using System.ComponentModel.DataAnnotations;
 using MVCMediaShareAppNew.Enums;
 
-namespace MVCMediaShareAppNew.Models
+namespace MVCMediaShareAppNew.Models.DbModels
 {
     public class BlogPost
     {
@@ -19,8 +19,9 @@ namespace MVCMediaShareAppNew.Models
         [JsonPropertyName("content")]
         public string Content { get; set; }
         
-        [JsonPropertyName("mediaUrl")]
-        public string? MediaUrl { get; set; }
+        [JsonPropertyName("mediaBlobUrl")]
+        public string? MediaBlobUrl { get; set; }
+
         [JsonPropertyName("mediaBlobName")] 
         public string? MediaBlobName { get; set; }
 
@@ -43,7 +44,7 @@ namespace MVCMediaShareAppNew.Models
         public List<Comment> Comments { get; set; } = new List<Comment>();
 
         [JsonPropertyName("state")]
-        public string State { get; set; } = Enum.GetName<BlogCreationState>(BlogCreationState.Draft);
+        public string State { get; set; } = Enum.GetName(BlogCreationState.Draft);
 
         // New properties for likes
         public int LikeCount { get; set; } // Total number of likes

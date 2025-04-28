@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 
-namespace MVCMediaShareAppNew.Models
+namespace MVCMediaShareAppNew.Models.DbModels
 {
     public class Comment
     {
@@ -11,8 +11,10 @@ namespace MVCMediaShareAppNew.Models
         [MinLength(1, ErrorMessage = "Comment must not be empty")]
         public string Text { get; set; }
         
-        public string? MediaUrl { get; set; }
-        
+        public string? MediaBlobUrl { get; set; }
+
+        public string? MediaBlobName { get; set; }
+
         public string? MediaType { get; set; }
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
