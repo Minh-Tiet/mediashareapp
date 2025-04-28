@@ -1,4 +1,4 @@
-namespace MVCMediaShareAppNew.Models
+namespace MVCMediaShareAppNew.Models.ViewModels
 {
     public class ErrorViewModel
     {

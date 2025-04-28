@@ -1,7 +1,7 @@
 using System;
 using System.Text.Json.Serialization;
 
-namespace MVCMediaShareAppNew.Models
+namespace MVCMediaShareAppNew.Models.ViewModels
 {
     public class UserImage
     {

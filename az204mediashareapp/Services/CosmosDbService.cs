@@ -1,6 +1,8 @@
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Options;
-using MVCMediaShareAppNew.Models;
+using MVCMediaShareAppNew.Models.DbModels;
+using MVCMediaShareAppNew.Models.SettingsModels;
+using MVCMediaShareAppNew.Models.ViewModels;
 
 namespace MVCMediaShareAppNew.Services
 {

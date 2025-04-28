@@ -1,6 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.FeatureManagement;
+using MVCMediaShareAppNew.CustomAttributes;
+using MVCMediaShareAppNew.Enums;
 using MVCMediaShareAppNew.Models;
+using MVCMediaShareAppNew.Models.ViewModels;
 using MVCMediaShareAppNew.Services;
 using System.Security.Claims;
 
@@ -11,15 +15,23 @@ namespace MVCMediaShareAppNew.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
+    [RestrictAccess("Image APIs are under maintenance until further notice.")]
     public class ImagesController : ControllerBase
     {
         private readonly ICosmosDbService _cosmosDbService;
         private readonly ILogger<ImagesController> _logger;
+        private readonly FeatureManager _featureManager;
+        private readonly BlobStorageService _blobStorageService;
 
-        public ImagesController(ICosmosDbService cosmosDbService, ILogger<ImagesController> logger)
+        public ImagesController(ICosmosDbService cosmosDbService, 
+            ILogger<ImagesController> logger, 
+            BlobStorageService blobStorageService, 
+            FeatureManager featureManager)
         {
             _cosmosDbService = cosmosDbService;
             _logger = logger;
+            _blobStorageService = blobStorageService;
+            _featureManager = featureManager;
         }
 
         [HttpGet("user/{userId}")]
@@ -33,22 +45,22 @@ namespace MVCMediaShareAppNew.Controllers
                 }
 
                 var blogPosts = await _cosmosDbService.GetAllBlogPostsByAuthorAsync(userId);
-                
-                // Convert blog posts to UserImage models, only including posts with media
+                var ifNoSas = await _featureManager.IsEnabledAsync(Enum.GetName(ConfigFeatureFlags.StoreBlobItemWithSas)) == false;
                 var images = blogPosts
-                    .Where(post => !string.IsNullOrEmpty(post.MediaUrl) && post.MediaType?.StartsWith("image/") == true)
-                    .Select(post => new UserImage
+                    .OrderByDescending(post => post.CreatedAt)
+                    .ToList()
+                    .Where(post => !string.IsNullOrEmpty(post.MediaBlobUrl) && post.MediaType?.StartsWith("image/") == true)
+                    .Select(async post => new UserImage
                     {
                         Id = post.id,
                         UserId = post.AuthorId ?? userId,
                         UserName = post.AuthorName ?? "Anonymous",
-                        ImageUrlWithSas = post.MediaUrl,
+                        ImageUrlWithSas = ifNoSas ? await _blobStorageService.GetSasTokenForBlobAsync(post.MediaBlobName) : post.MediaBlobUrl, // If no Sas associated, gen new Sas for each blob url
                         CreatedAt = post.CreatedAt
-                    })
-                    .OrderByDescending(img => img.CreatedAt)
-                    .ToList();
+                    });
+                var response = await Task.WhenAll(images);
 
-                return Ok(images);
+                return Ok(response.ToList());
             }
             catch (Exception ex)
             {
