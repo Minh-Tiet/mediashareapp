@@ -55,7 +55,7 @@ namespace MVCMediaShareAppNew.Controllers
                         Id = post.id,
                         UserId = post.AuthorId ?? userId,
                         UserName = post.AuthorName ?? "Anonymous",
-                        ImageUrlWithSas = ifNoSas ? await _blobStorageService.GetSasTokenForBlobAsync(post.MediaBlobName) : post.MediaBlobUrl, // If no Sas associated, gen new Sas for each blob url
+                        ImageUrlWithSas = ifNoSas ? (await _blobStorageService.BuildSasTokenFromBlobAsync(post.MediaBlobName)).ToString() : post.MediaBlobUrl, // If no Sas associated, gen new Sas for each blob url
                         CreatedAt = post.CreatedAt
                     });
                 var response = await Task.WhenAll(images);

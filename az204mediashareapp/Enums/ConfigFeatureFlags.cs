@@ -7,6 +7,8 @@ namespace MVCMediaShareAppNew.Enums
         [Description("Enable Deletion any other blog for any other account")]
         AllowBlogDeletionAny,
         [Description("Enable storing SAS token with blob url on container level")]
-        StoreBlobItemWithSas
+        StoreBlobItemWithSas,
+        [Description("Enable storing FrontDoor content caching")]
+        EnableFrontDoorCaching
     }
 }
