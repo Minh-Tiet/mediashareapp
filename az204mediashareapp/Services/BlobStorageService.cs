@@ -20,7 +20,7 @@ namespace MVCMediaShareAppNew.Services
         bool HasSasToken(string blobUri);
         string RemoveSasFromBlobPath(string fullBlobPath);
         string ExtractBlobNameFromUrl(string blobUrl);
-        Task<string?> CheckAndAssignSasToken(string blobUrl);
+        Task<string?> CheckAndAssignSasToken(string? blobUrl);
     }
 
     public class BlobStorageService : IBlobStorageService
@@ -101,7 +101,8 @@ namespace MVCMediaShareAppNew.Services
                 }
 
                 _logger.LogInformation("File uploaded successfully to blob storage: {BlobName}", fileName);
-                return (await UpdateCdnHostBlobUri(blobClient.Uri)).ToString();
+                Uri returnedUploadedBlobUri = await UpdateCdnHostBlobUri(blobClient.Uri);
+                return returnedUploadedBlobUri.ToString();
             }
             catch (Exception ex)
             {
@@ -222,30 +223,30 @@ namespace MVCMediaShareAppNew.Services
         /// </summary>
         /// <param name="blobUri"></param>
         /// <returns></returns>
-        async Task<Uri?> UpdateCdnHostBlobUri(Uri? blobUri)
+        async Task<Uri> UpdateCdnHostBlobUri(Uri blobUri)
         {
             if (!_hostEnvironment.IsDevelopment())
             {
                 try
                 { 
-                    _logger.LogInformation($"Blob URI: {blobUri?.ToString()} - CdnEndpoint: {_cdnEndpoint}");
+                    _logger.LogInformation($"Blob URI: {blobUri.ToString()} - CdnEndpoint: {_cdnEndpoint}");
                     
                     var enableFrontDoorCaching = await _featureManager.IsEnabledAsync(Enum.GetName(ConfigFeatureFlags.EnableFrontDoorCaching));
                     if (enableFrontDoorCaching)
                     {
-                        if (blobUri != null)
+                        if (_cdnEndpoint != null)
                         {
                             var uriBuilder = new UriBuilder(blobUri)
                             {
-                                Host = _cdnEndpoint // Replace with your Front Door domain
+                                Host = _cdnEndpoint, // Replace with your Front Door domain
+                                Scheme = "https" // Ensure HTTPS
                             };
-                            uriBuilder.Scheme = "https"; // Ensure HTTPS
                             _logger.LogInformation($"Updated successfully for blob URI for CDN: {uriBuilder.Uri.ToString()}");
                             return uriBuilder.Uri;
                         }
                         else
                         {
-                            return null;
+                            return blobUri;
                         }
                     }
                     else
@@ -261,7 +262,7 @@ namespace MVCMediaShareAppNew.Services
             }
             else
             {
-                // In development mode, return the original blob URI
+                // In development mode, nothing to do and return the original blob URI
                 return blobUri;
             }
         } 
@@ -344,7 +345,7 @@ namespace MVCMediaShareAppNew.Services
         /// </summary>
         /// <param name="blobUrl"></param>
         /// <returns></returns>
-        public async Task<string?> CheckAndAssignSasToken(string blobUrl)
+        public async Task<string?> CheckAndAssignSasToken(string? blobUrl)
         {
             var storeSasFeatureEnabled = await _featureManager.IsEnabledAsync(Enum.GetName(ConfigFeatureFlags.StoreBlobItemWithSas));
             _logger.LogInformation($"StoreSasFeatureEnabled: {storeSasFeatureEnabled} - Blob Url: {blobUrl}");
@@ -358,7 +359,7 @@ namespace MVCMediaShareAppNew.Services
                         _logger.LogInformation("Reading SAS token from Redis and append it to blob url.");
                         var sasTokenFromCache = GetContainerLevelSasFromRedisCache();
                         var newBlobUri = new Uri($"{blobUrl}{sasTokenFromCache}");
-                        return (await UpdateCdnHostBlobUri(newBlobUri))?.ToString();
+                        return (await UpdateCdnHostBlobUri(newBlobUri)).ToString();
                     }
                     else
                     {
@@ -372,14 +373,14 @@ namespace MVCMediaShareAppNew.Services
                         _logger.LogInformation("SAS token is not present in blob URL. Generating a new one.");
                         // If the blob URL does not have a SAS token, generate a new one
                         var newBlobUriWithSas = await BuildSasTokenFromBlobAsync(blobUrl);
-                        return (await UpdateCdnHostBlobUri(newBlobUriWithSas))?.ToString();
+                        return (await UpdateCdnHostBlobUri(newBlobUriWithSas)).ToString();
                     }
                     else
                     {
                         _logger.LogInformation("SAS token is already present in blob URL. No action needed.");
                         if (Uri.TryCreate(blobUrl, UriKind.Absolute, out Uri? blobUri))
                         {
-                            return (await UpdateCdnHostBlobUri(blobUri))?.ToString();
+                            return (await UpdateCdnHostBlobUri(blobUri)).ToString();
                         } else
                         {
                             return blobUrl;
