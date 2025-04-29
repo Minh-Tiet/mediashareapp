@@ -53,10 +53,10 @@ namespace MVCMediaShareAppNew.Controllers
                 var response = posts.Where(p => p.MediaBlobUrl != null).OrderByDescending(p => p.CreatedAt).ToList();
                 response.ForEach(async blob =>
                 {
-                    blob.MediaBlobUrl = await CheckAndAssignSasToken(blob.MediaBlobUrl);
+                    blob.MediaBlobUrl = await _blobStorageService.CheckAndAssignSasToken(blob.MediaBlobUrl);
                     blob.Comments.ForEach(async c =>
                     {
-                        c.MediaBlobUrl = await CheckAndAssignSasToken(c.MediaBlobUrl);
+                        c.MediaBlobUrl = await _blobStorageService.CheckAndAssignSasToken(c.MediaBlobUrl);
                     });
                 });
 
@@ -130,7 +130,7 @@ namespace MVCMediaShareAppNew.Controllers
                     if (await _featureManager.IsEnabledAsync(Enum.GetName(ConfigFeatureFlags.StoreBlobItemWithSas)))
                     {
                         // Generate container-level SAS token and append it to the base URL
-                        string sasToken = _blobStorageService.GetSasTokenFromRedisCache();
+                        string sasToken = _blobStorageService.GetContainerLevelSasFromRedisCache();
                         post.MediaBlobUrl = $"{baseMediaUrl}{sasToken}"; // Append SAS token to the URL
                     }
                     else
@@ -323,7 +323,7 @@ namespace MVCMediaShareAppNew.Controllers
                         UserName = User.Identity?.Name ?? "Anonymous",
                         OriginMediaName = mediaItem.OriginMediaName,
                         ImageBlogName = mediaItem.MediaStorageBlobName,
-                        ImageUrlWithSas = await CheckAndAssignSasToken(mediaItem.MediaStorageBlobUrl),
+                        ImageUrlWithSas = await _blobStorageService.CheckAndAssignSasToken(mediaItem.MediaStorageBlobUrl),
                         CreatedAt = mediaItem.CreatedAt
                     });
                 var response = await Task.WhenAll(images); // Wait for all tasks to complete
@@ -398,7 +398,7 @@ namespace MVCMediaShareAppNew.Controllers
                     if (await _featureManager.IsEnabledAsync(Enum.GetName(ConfigFeatureFlags.StoreBlobItemWithSas)))
                     {
                         // Generate container-level SAS token and append it to the base URL
-                        string sasToken = _blobStorageService.GetSasTokenFromRedisCache();
+                        string sasToken = _blobStorageService.GetContainerLevelSasFromRedisCache();
                         comment.MediaBlobUrl = $"{baseMediaUrl}{sasToken}"; // Append SAS token to the URL
                     }
                     else
@@ -458,7 +458,7 @@ namespace MVCMediaShareAppNew.Controllers
 
                 comments.ForEach(async c =>
                 {
-                    c.MediaBlobUrl = await CheckAndAssignSasToken(c.MediaBlobUrl);
+                    c.MediaBlobUrl = await _blobStorageService.CheckAndAssignSasToken(c.MediaBlobUrl);
                 });
 
                 return PartialView("_CommentsList", comments);
@@ -491,7 +491,7 @@ namespace MVCMediaShareAppNew.Controllers
                         Id = mediaItem.id,
                         UserId = userId,
                         UserName = User.Identity?.Name ?? "Anonymous",
-                        ImageUrlWithSas = await CheckAndAssignSasToken(mediaItem.MediaStorageBlobUrl),
+                        ImageUrlWithSas = await _blobStorageService.CheckAndAssignSasToken(mediaItem.MediaStorageBlobUrl),
                         OriginMediaName = mediaItem.OriginMediaName,
                         ImageBlogName = mediaItem.MediaStorageBlobName,
                         CreatedAt = mediaItem.CreatedAt
@@ -609,40 +609,6 @@ namespace MVCMediaShareAppNew.Controllers
             {
                 _logger.LogError(ex, "Error toggling like for blog post {BlogPostId}", blogPostId);
                 return Json(new { success = false, message = "Error updating like. Please try again later." });
-            }
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="blobUrl"></param>
-        /// <returns></returns>
-        async Task<string> CheckAndAssignSasToken(string blobUrl)
-        {
-            var storeSasFeatureEnabled = await _featureManager.IsEnabledAsync(Enum.GetName(ConfigFeatureFlags.StoreBlobItemWithSas));
-
-            if (storeSasFeatureEnabled)
-            {
-                if (!string.IsNullOrEmpty(blobUrl) && !_blobStorageService.HasSasToken(blobUrl))
-                {
-                    var sasTokenFromCache = _blobStorageService.GetSasTokenFromRedisCache();
-                    return $"{blobUrl}{sasTokenFromCache}";
-                }
-                else
-                {
-                    return blobUrl;
-                }
-            }
-            else
-            {
-                if (!string.IsNullOrEmpty(blobUrl) && !_blobStorageService.HasSasToken(blobUrl))
-                {
-                    return await _blobStorageService.GetSasTokenForBlobAsync(blobUrl);
-                }
-                else
-                {
-                    return blobUrl;
-                }
             }
         }
     }

@@ -91,6 +91,10 @@ builder.Services.AddControllersWithViews(options =>
 builder.Services.AddRazorPages()
     .AddMicrosoftIdentityUI();
 
+// Add Feature Management
+builder.Services.AddFeatureManagement();
+builder.Services.AddAzureAppConfiguration();
+
 // Configure Cosmos DB
 builder.Services.Configure<CosmosDbSettings>(builder.Configuration.GetSection("CosmosDb"));
 
@@ -128,10 +132,6 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
         return ConnectionMultiplexer.Connect(redisConnectionString ?? "localhost:6379");
     }
 });
-
-// Add Feature Management
-builder.Services.AddFeatureManagement();
-builder.Services.AddAzureAppConfiguration();
 
 // Configure logging
 builder.Services.AddLogging(logging =>

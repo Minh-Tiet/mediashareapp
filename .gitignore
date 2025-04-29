@@ -31,3 +31,4 @@ imageprocessor/obj/Release/*
 /BlogNotificationProcessor/bin
 /BlogNotificationProcessor/obj
 *.user
+/imageprocessor/Properties/ServiceDependencies/ImageMetadataExtractor - Zip Deploy/profile.arm.json
