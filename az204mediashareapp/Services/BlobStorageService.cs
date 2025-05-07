@@ -43,7 +43,6 @@ namespace MVCMediaShareAppNew.Services
         public BlobStorageService(
             IOptions<AzureStorageSettings> settings,
             ILogger<BlobStorageService> logger,
-            IConnectionMultiplexer redis,
             IConfiguration configuration,
             IHostEnvironment hostEnvironment,
             IFeatureManager featureManager)
@@ -63,9 +62,7 @@ namespace MVCMediaShareAppNew.Services
                 _hostEnvironment = hostEnvironment;
                 _blobServiceClient = new BlobServiceClient(connectionStringSecret);
                 _containerClient = _blobServiceClient.GetBlobContainerClient(_settings.ContainerName);
-                _redisDb = redis.GetDatabase();
                 _containerName = configuration["AzureStorage:ContainerName"] ?? "";
-                _sasTokenCacheKey = configuration["Redis:BlobContainerSasTokenKey"] ?? "";
                 _containerSasExpiredInDays = int.Parse(configuration["AzureStorage:ContainerSasExpiredInDays"] ?? "7");
                 _blobItemSasExpiredInMinutes = int.Parse(configuration["AzureStorage:BlobItemSasExpiredInMinutes"] ?? "1");
                 _featureManager = featureManager;
@@ -128,7 +125,7 @@ namespace MVCMediaShareAppNew.Services
 
         public string GetContainerLevelSasFromRedisCache()
         {
-            try
+            /*try
             {
                 // Check if the SAS token exists in Redis
                 string? cachedSasToken = _redisDb.StringGet(_sasTokenCacheKey);
@@ -179,7 +176,8 @@ namespace MVCMediaShareAppNew.Services
             {
                 _logger.LogError(ex, "Error generating or caching SAS token for container {ContainerName}", _settings.ContainerName);
                 throw;
-            }
+            }*/
+            return string.Empty;
         }
 
         /// <summary>

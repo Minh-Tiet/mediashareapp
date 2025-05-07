@@ -62,7 +62,7 @@ builder.Configuration.AddAzureAppConfiguration(options =>
 {
     // Use Azure App Configuration
     var endpoint = builder.Configuration["AppConfiguration:Endpoint"];
-    var connectionString = builder.Configuration["AppConfiguration:ConnectionString"];
+    //var connectionString = builder.Configuration["AppConfiguration:ConnectionString"];
     var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
     {
         ManagedIdentityClientId = builder.Configuration["ManagedIdentityClientId"]
@@ -114,7 +114,7 @@ builder.Services.AddSingleton<SBQueueService>();
 
 // Register factory
 builder.Services.AddSingleton<IQueueServiceFactory, QueueServiceFactory>();
-
+/*
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
     if (!builder.Environment.IsDevelopment())
@@ -132,7 +132,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
         return ConnectionMultiplexer.Connect(redisConnectionString ?? "localhost:6379");
     }
 });
-
+*/
 // Configure logging
 builder.Services.AddLogging(logging =>
 {
