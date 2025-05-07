@@ -15,25 +15,11 @@ namespace MVCMediaShareAppNew.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
-    [RestrictAccess("Image APIs are under maintenance until further notice.")]
-    public class ImagesController : ControllerBase
+    public class ImagesController(ICosmosDbService cosmosDbService,
+        ILogger<ImagesController> logger,
+        IBlobStorageService blobStorageService,
+        IFeatureManager featureManager) : ControllerBase
     {
-        private readonly ICosmosDbService _cosmosDbService;
-        private readonly ILogger<ImagesController> _logger;
-        private readonly FeatureManager _featureManager;
-        private readonly BlobStorageService _blobStorageService;
-
-        public ImagesController(ICosmosDbService cosmosDbService, 
-            ILogger<ImagesController> logger, 
-            BlobStorageService blobStorageService, 
-            FeatureManager featureManager)
-        {
-            _cosmosDbService = cosmosDbService;
-            _logger = logger;
-            _blobStorageService = blobStorageService;
-            _featureManager = featureManager;
-        }
-
         [HttpGet("user/{userId}")]
         public async Task<IActionResult> GetImagesByUserId(string userId)
         {
@@ -44,8 +30,8 @@ namespace MVCMediaShareAppNew.Controllers
                     return BadRequest("UserId is required");
                 }
 
-                var blogPosts = await _cosmosDbService.GetAllBlogPostsByAuthorAsync(userId);
-                var ifNoSas = await _featureManager.IsEnabledAsync(Enum.GetName(ConfigFeatureFlags.StoreBlobItemWithSas)) == false;
+                var blogPosts = await cosmosDbService.GetAllBlogPostsByAuthorAsync(userId);
+                var ifNoSas = await featureManager.IsEnabledAsync(Enum.GetName(ConfigFeatureFlags.StoreBlobItemWithSas)) == false;
                 var images = blogPosts
                     .OrderByDescending(post => post.CreatedAt)
                     .ToList()
@@ -55,7 +41,7 @@ namespace MVCMediaShareAppNew.Controllers
                         Id = post.id,
                         UserId = post.AuthorId ?? userId,
                         UserName = post.AuthorName ?? "Anonymous",
-                        ImageUrlWithSas = ifNoSas ? (await _blobStorageService.BuildSasTokenFromBlobAsync(post.MediaBlobName)).ToString() : post.MediaBlobUrl, // If no Sas associated, gen new Sas for each blob url
+                        ImageUrlWithSas = ifNoSas ? (await blobStorageService.BuildSasTokenFromBlobAsync(post.MediaBlobName)).ToString() : post.MediaBlobUrl, // If no Sas associated, gen new Sas for each blob url
                         CreatedAt = post.CreatedAt
                     });
                 var response = await Task.WhenAll(images);
@@ -64,7 +50,7 @@ namespace MVCMediaShareAppNew.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving user images for userId: {UserId}", userId);
+                logger.LogError(ex, "Error retrieving user images for userId: {UserId}", userId);
                 return StatusCode(500, "An error occurred while retrieving user images");
             }
         }
